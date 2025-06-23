@@ -72,8 +72,9 @@
     starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
     scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1 })));
 
-    // Asteroid Belts (point clouds in XZ plane)
-    function addAsteroidBelt(innerR, outerR, count, color, size) {
+    // Asteroid Belts (animated point clouds in XZ plane)
+    const belts = [];
+    function addAsteroidBelt(innerR, outerR, count, color, size, speed) {
       const geom = new THREE.BufferGeometry();
       const verts = [];
       for (let i = 0; i < count; i++) {
@@ -86,10 +87,12 @@
         );
       }
       geom.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-      scene.add(new THREE.Points(geom, new THREE.PointsMaterial({ color, size })));
+      const points = new THREE.Points(geom, new THREE.PointsMaterial({ color, size }));
+      scene.add(points);
+      belts.push({ points, speed });
     }
-    addAsteroidBelt(40, 50, 1500, 0x888888, 0.5);
-    addAsteroidBelt(110, 130, 2000, 0xbbbbbb, 0.7);
+    addAsteroidBelt(40, 50, 1500, 0x888888, 0.5, 0.002);
+    addAsteroidBelt(110, 130, 2000, 0xbbbbbb, 0.7, 0.001);
 
     // Sun & Lighting
     scene.add(new THREE.AmbientLight(0x333333));
@@ -139,23 +142,23 @@
       label.position.set(0, def.size + 2, 0);
       mesh.add(label);
 
-      // Orbit Path (Ellipse in XY, rotated into XZ)
+      // Orbit Path
       const curve = new THREE.EllipseCurve(0,0, def.a, def.b, 0, Math.PI * 2, false);
       const pts = curve.getPoints(128);
       const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      // Compute distances for dashed effect
-      const posArr=geo.attributes.position.array;
-      const ld=new Float32Array(posArr.length/3);
-      let sum=0; ld[0]=0;
-      for(let i=1;i<ld.length;i++){
+      // Compute distances
+      const posArr = geo.attributes.position.array;
+      const ld = new Float32Array(posArr.length/3);
+      let acc=0; ld[0]=0;
+      for (let i=1; i<ld.length; i++) {
         const i3=i*3, i3m=(i-1)*3;
         const dx=posArr[i3]-posArr[i3m], dz=posArr[i3+2]-posArr[i3m+2];
-        sum+=Math.sqrt(dx*dx+dz*dz);
-        ld[i]=sum;
+        acc += Math.sqrt(dx*dx + dz*dz);
+        ld[i] = acc;
       }
       geo.setAttribute('lineDistance', new THREE.BufferAttribute(ld,1));
-      const mat=new THREE.LineDashedMaterial({ color:0xffffff, dashSize:1, gapSize:1 });
-      const orbit=new THREE.LineLoop(geo, mat);
+      const mat = new THREE.LineDashedMaterial({ color:0xffffff, dashSize:1, gapSize:1 });
+      const orbit = new THREE.LineLoop(geo, mat);
       orbit.computeLineDistances();
       orbit.rotation.x = -Math.PI/2;
       scene.add(orbit);
@@ -166,23 +169,26 @@
     // Animation
     function animate() {
       requestAnimationFrame(animate);
+      // Move planets
       planets.forEach(p => {
-        p.angle+=p.def.speed;
-        const x=p.def.a*Math.cos(p.angle);
-        const z=p.def.b*Math.sin(p.angle);
-        p.mesh.position.set(x,0,z);
+        p.angle += p.def.speed;
+        const x = p.def.a * Math.cos(p.angle);
+        const z = p.def.b * Math.sin(p.angle);
+        p.mesh.position.set(x, 0, z);
       });
+      // Rotate belts
+      belts.forEach(b => b.points.rotation.y -= b.speed);
       controls.update();
-      renderer.render(scene,camera);
+      renderer.render(scene, camera);
       updateInfo();
     }
     animate();
 
-    // Handle Resize
-    window.addEventListener('resize',()=>{
-      camera.aspect=window.innerWidth/window.innerHeight;
+    // Resize
+    window.addEventListener('resize', ()=>{
+      camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth,window.innerHeight);
+      renderer.setSize(window.innerWidth, window.innerHeight);
       updateInfo();
     });
   </script>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Solar System Simulator</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #info {
+      position: absolute;
+      top: 0;
+      left: 0;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 8px;
+      font-family: monospace;
+      font-size: 12px;
+      line-height: 1.2;
+      white-space: pre;
+      z-index: 100;
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.149.0/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="info"></div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'https://unpkg.com/three@0.149.0/examples/jsm/controls/OrbitControls.js';
+
+    // Scene & Camera
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(200, 100, 200);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // Info Overlay
+    const infoDiv = document.getElementById('info');
+    function updateInfo() {
+      const p = camera.position;
+      infoDiv.textContent =
+        `FOV: ${camera.fov.toFixed(1)}°\n` +
+        `Aspect: ${camera.aspect.toFixed(2)}\n` +
+        `Position:\n  x: ${p.x.toFixed(1)}\n  y: ${p.y.toFixed(1)}\n  z: ${p.z.toFixed(1)}`;
+    }
+
+    // Stars
+    const starGeo = new THREE.BufferGeometry();
+    const starVerts = [];
+    for (let i = 0; i < 1000; i++) {
+      starVerts.push(
+        THREE.MathUtils.randFloatSpread(1000),
+        THREE.MathUtils.randFloatSpread(1000),
+        THREE.MathUtils.randFloatSpread(1000)
+      );
+    }
+    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
+    scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1 })));
+
+    // Asteroid Belts (point clouds in XZ plane)
+    function addAsteroidBelt(innerR, outerR, count, color, size) {
+      const geom = new THREE.BufferGeometry();
+      const verts = [];
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const r = THREE.MathUtils.randFloat(innerR, outerR);
+        verts.push(
+          r * Math.cos(angle),
+          0,
+          r * Math.sin(angle)
+        );
+      }
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+      scene.add(new THREE.Points(geom, new THREE.PointsMaterial({ color, size })));
+    }
+    addAsteroidBelt(40, 50, 1500, 0x888888, 0.5);
+    addAsteroidBelt(110, 130, 2000, 0xbbbbbb, 0.7);
+
+    // Sun & Lighting
+    scene.add(new THREE.AmbientLight(0x333333));
+    const sunLight = new THREE.PointLight(0xffffff, 2, 1000);
+    scene.add(sunLight);
+    const sun = new THREE.Mesh(
+      new THREE.SphereGeometry(10, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0xffff00 })
+    );
+    scene.add(sun);
+    sunLight.position.copy(sun.position);
+
+    // Planet Definitions
+    const planetDefs = [
+      { name:'Mercury', size:1, a:15, b:15, color:0xaaaaaa, speed:0.04 },
+      { name:'Venus',   size:2, a:22, b:22, color:0xffa500, speed:0.015 },
+      { name:'Earth',   size:2.5,a:30, b:30, color:0x0000ff, speed:0.01 },
+      { name:'Mars',    size:1.5,a:38, b:38, color:0xff0000, speed:0.008 },
+      { name:'Jupiter', size:5, a:55, b:55, color:0xffd27f, speed:0.002 },
+      { name:'Saturn',  size:4, a:70, b:70, color:0xffffb2, speed:0.0015 },
+      { name:'Uranus',  size:3.5,a:85, b:85, color:0xadd8e6, speed:0.001 },
+      { name:'Neptune', size:3.5,a:100,b:100,color:0x00008b, speed:0.0005 }
+    ];
+
+    // Label Sprite Utility
+    function createLabel(text) {
+      const canvas = document.createElement('canvas'); canvas.width=256; canvas.height=64;
+      const ctx = canvas.getContext('2d');
+      ctx.font='36px Arial'; ctx.fillStyle='white';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(text,128,32);
+      const tex=new THREE.CanvasTexture(canvas);
+      const sprite=new THREE.Sprite(new THREE.SpriteMaterial({ map:tex }));
+      sprite.scale.set(12,3,1);
+      return sprite;
+    }
+
+    // Planets & Orbits
+    const planets = planetDefs.map(def => {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(def.size,32,32),
+        new THREE.MeshLambertMaterial({ color:def.color })
+      );
+      scene.add(mesh);
+      // Label
+      const label = createLabel(def.name);
+      label.position.set(0, def.size + 2, 0);
+      mesh.add(label);
+
+      // Orbit Path (Ellipse in XY, rotated into XZ)
+      const curve = new THREE.EllipseCurve(0,0, def.a, def.b, 0, Math.PI * 2, false);
+      const pts = curve.getPoints(128);
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      // Compute distances for dashed effect
+      const posArr=geo.attributes.position.array;
+      const ld=new Float32Array(posArr.length/3);
+      let sum=0; ld[0]=0;
+      for(let i=1;i<ld.length;i++){
+        const i3=i*3, i3m=(i-1)*3;
+        const dx=posArr[i3]-posArr[i3m], dz=posArr[i3+2]-posArr[i3m+2];
+        sum+=Math.sqrt(dx*dx+dz*dz);
+        ld[i]=sum;
+      }
+      geo.setAttribute('lineDistance', new THREE.BufferAttribute(ld,1));
+      const mat=new THREE.LineDashedMaterial({ color:0xffffff, dashSize:1, gapSize:1 });
+      const orbit=new THREE.LineLoop(geo, mat);
+      orbit.computeLineDistances();
+      orbit.rotation.x = -Math.PI/2;
+      scene.add(orbit);
+
+      return { mesh, angle: Math.random()*Math.PI*2, def };
+    });
+
+    // Animation
+    function animate() {
+      requestAnimationFrame(animate);
+      planets.forEach(p => {
+        p.angle+=p.def.speed;
+        const x=p.def.a*Math.cos(p.angle);
+        const z=p.def.b*Math.sin(p.angle);
+        p.mesh.position.set(x,0,z);
+      });
+      controls.update();
+      renderer.render(scene,camera);
+      updateInfo();
+    }
+    animate();
+
+    // Handle Resize
+    window.addEventListener('resize',()=>{
+      camera.aspect=window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth,window.innerHeight);
+      updateInfo();
+    });
+  </script>
+</body>
+</html>

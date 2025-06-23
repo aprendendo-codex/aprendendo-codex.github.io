@@ -36,15 +36,12 @@
     // Scene & Camera
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000);
-
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
     camera.position.set(200, 100, 200);
     camera.lookAt(0, 0, 0);
-
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
-
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
@@ -72,7 +69,7 @@
     starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
     scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1 })));
 
-    // Asteroid Belts (animated point clouds in XZ plane)
+    // Asteroid Belts (animated point clouds, slight Y-randomness for thickness)
     const belts = [];
     function addAsteroidBelt(innerR, outerR, count, color, size, speed) {
       const geom = new THREE.BufferGeometry();
@@ -80,18 +77,17 @@
       for (let i = 0; i < count; i++) {
         const angle = Math.random() * Math.PI * 2;
         const r = THREE.MathUtils.randFloat(innerR, outerR);
-        verts.push(
-          r * Math.cos(angle),
-          0,
-          r * Math.sin(angle)
-        );
+        const x = r * Math.cos(angle);
+        const z = r * Math.sin(angle);
+        const y = THREE.MathUtils.randFloatSpread(2);  // ±1 unit of vertical randomness
+        verts.push(x, y, z);
       }
       geom.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
       const points = new THREE.Points(geom, new THREE.PointsMaterial({ color, size }));
       scene.add(points);
       belts.push({ points, speed });
     }
-    addAsteroidBelt(40, 50, 1500, 0x888888, 0.5, 0.002);
+    addAsteroidBelt(40,  50, 1500, 0x888888, 0.5, 0.002);
     addAsteroidBelt(110, 130, 2000, 0xbbbbbb, 0.7, 0.001);
 
     // Sun & Lighting
@@ -105,87 +101,115 @@
     scene.add(sun);
     sunLight.position.copy(sun.position);
 
-    // Planet Definitions
-    const planetDefs = [
-      { name:'Mercury', size:1, a:15, b:15, color:0xaaaaaa, speed:0.04 },
-      { name:'Venus',   size:2, a:22, b:22, color:0xffa500, speed:0.015 },
-      { name:'Earth',   size:2.5,a:30, b:30, color:0x0000ff, speed:0.01 },
-      { name:'Mars',    size:1.5,a:38, b:38, color:0xff0000, speed:0.008 },
-      { name:'Jupiter', size:5, a:55, b:55, color:0xffd27f, speed:0.002 },
-      { name:'Saturn',  size:4, a:70, b:70, color:0xffffb2, speed:0.0015 },
-      { name:'Uranus',  size:3.5,a:85, b:85, color:0xadd8e6, speed:0.001 },
-      { name:'Neptune', size:3.5,a:100,b:100,color:0x00008b, speed:0.0005 }
+    // Planet Definitions (inclination in degrees)
+    const planetDefs = [ 
+      { name:'Mercury', size:1,  a:15,  b:15,  color:0xaaaaaa, speed:0.04,  inclination:  7.0 },
+      { name:'Venus',   size:2,  a:22,  b:22,  color:0xffa500, speed:0.015, inclination:  3.39 },
+      { name:'Earth',   size:2.5,a:30,  b:30,  color:0x0000ff, speed:0.01,  inclination:  0.0 },
+      { name:'Mars',    size:1.5,a:38,  b:38,  color:0xff0000, speed:0.008, inclination:  1.85 },
+      { name:'Jupiter', size:5,  a:55,  b:55,  color:0xffd27f, speed:0.002, inclination:  1.305 },
+      { name:'Saturn',  size:4,  a:70,  b:70,  color:0xffffb2, speed:0.0015,inclination:  2.485 },
+      { name:'Uranus',  size:3.5,a:85,  b:85,  color:0xadd8e6, speed:0.001, inclination:  0.772 },
+      { name:'Neptune', size:3.5,a:100, b:100, color:0x00008b, speed:0.0005,inclination:  1.77 }
     ];
 
     // Label Sprite Utility
     function createLabel(text) {
-      const canvas = document.createElement('canvas'); canvas.width=256; canvas.height=64;
+      const canvas = document.createElement('canvas');
+      canvas.width = 256; canvas.height = 64;
       const ctx = canvas.getContext('2d');
-      ctx.font='36px Arial'; ctx.fillStyle='white';
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText(text,128,32);
-      const tex=new THREE.CanvasTexture(canvas);
-      const sprite=new THREE.Sprite(new THREE.SpriteMaterial({ map:tex }));
-      sprite.scale.set(12,3,1);
+      ctx.font = '36px Arial';
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 128, 32);
+      const tex = new THREE.CanvasTexture(canvas);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
+      sprite.scale.set(12, 3, 1);
       return sprite;
     }
 
     // Planets & Orbits
     const planets = planetDefs.map(def => {
+      // planet mesh + label
       const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(def.size,32,32),
-        new THREE.MeshLambertMaterial({ color:def.color })
+        new THREE.SphereGeometry(def.size, 32, 32),
+        new THREE.MeshLambertMaterial({ color: def.color })
       );
-      scene.add(mesh);
-      // Label
       const label = createLabel(def.name);
       label.position.set(0, def.size + 2, 0);
       mesh.add(label);
+      scene.add(mesh);
 
-      // Orbit Path
-      const curve = new THREE.EllipseCurve(0,0, def.a, def.b, 0, Math.PI * 2, false);
+      // dashed, inclined orbit
+      const curve = new THREE.EllipseCurve(0, 0, def.a, def.b, 0, Math.PI * 2, false);
       const pts = curve.getPoints(128);
       const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      // Compute distances
+      // compute line distances for dash
       const posArr = geo.attributes.position.array;
-      const ld = new Float32Array(posArr.length/3);
-      let acc=0; ld[0]=0;
-      for (let i=1; i<ld.length; i++) {
-        const i3=i*3, i3m=(i-1)*3;
-        const dx=posArr[i3]-posArr[i3m], dz=posArr[i3+2]-posArr[i3m+2];
-        acc += Math.sqrt(dx*dx + dz*dz);
+      const ld = new Float32Array(posArr.length / 3);
+      let acc = 0;
+      ld[0] = 0;
+      for (let i = 1; i < ld.length; i++) {
+        const idx = i * 3, idxm = (i - 1) * 3;
+        const dx = posArr[idx]     - posArr[idxm];
+        const dz = posArr[idx + 2] - posArr[idxm + 2];
+        acc += Math.hypot(dx, dz);
         ld[i] = acc;
       }
-      geo.setAttribute('lineDistance', new THREE.BufferAttribute(ld,1));
+      geo.setAttribute('lineDistance', new THREE.BufferAttribute(ld, 1));
       const mat = new THREE.LineDashedMaterial({ color:0xffffff, dashSize:1, gapSize:1 });
       const orbit = new THREE.LineLoop(geo, mat);
-      orbit.computeLineDistances();
-      orbit.rotation.x = -Math.PI/2;
+      // rotate into XZ plane and tilt by inclination
+      orbit.rotation.x = -Math.PI / 2 + THREE.MathUtils.degToRad(def.inclination);
       scene.add(orbit);
 
-      return { mesh, angle: Math.random()*Math.PI*2, def };
+      return { mesh, angle: Math.random() * Math.PI * 2, def };
     });
 
-    // Animation
+    // Saturn's Ring
+    const sat = planets.find(p => p.def.name === 'Saturn');
+    if (sat) {
+      const innerR = sat.def.size + 1;
+      const outerR = sat.def.size + 2.5;
+      const ringGeo = new THREE.RingGeometry(innerR, outerR, 64);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color:      0x999999,
+        side:       THREE.DoubleSide,
+        transparent:true,
+        opacity:    0.5
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      sat.mesh.add(ring);
+    }
+
+    // Animation Loop
     function animate() {
       requestAnimationFrame(animate);
-      // Move planets
+
+      // move planets on their tilted orbits
       planets.forEach(p => {
         p.angle += p.def.speed;
-        const x = p.def.a * Math.cos(p.angle);
-        const z = p.def.b * Math.sin(p.angle);
-        p.mesh.position.set(x, 0, z);
+        const x0 = p.def.a * Math.cos(p.angle);
+        const z0 = p.def.b * Math.sin(p.angle);
+        const inc = THREE.MathUtils.degToRad(p.def.inclination);
+        const y  = z0 * Math.sin(inc);
+        const z  = z0 * Math.cos(inc);
+        p.mesh.position.set(x0, y, z);
       });
-      // Rotate belts
+
+      // rotate belts
       belts.forEach(b => b.points.rotation.y -= b.speed);
+
       controls.update();
       renderer.render(scene, camera);
       updateInfo();
     }
     animate();
 
-    // Resize
-    window.addEventListener('resize', ()=>{
+    // Handle resize
+    window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);

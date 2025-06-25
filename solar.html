@@ -1,220 +1,425 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>3D Solar System Simulator</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    #info {
-      position: absolute;
-      top: 0;
-      left: 0;
-      color: #fff;
-      background: rgba(0, 0, 0, 0.5);
-      padding: 8px;
-      font-family: monospace;
-      font-size: 12px;
-      line-height: 1.2;
-      white-space: pre;
-      z-index: 100;
-    }
-  </style>
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.149.0/build/three.module.js"
-      }
-    }
-  </script>
+<meta charset="UTF-8">
+<title>Solar‑System Demo – Heliosphere Edition</title>
+<style>
+  body{margin:0;overflow:hidden;background:#000;}
+  #info{
+    position:fixed;top:0;left:0;color:#fff;font:11px/1.3 monospace;
+    background:rgba(0,0,0,.45);padding:6px 8px;white-space:pre;z-index:10;
+  }
+</style>
+
+<!-- three.js 0.149.0 -->
+<script type="importmap">
+{
+  "imports":{
+    "three":"https://unpkg.com/three@0.149.0/build/three.module.js"
+  }
+}
+</script>
 </head>
 <body>
-  <div id="info"></div>
-  <script type="module">
-    import * as THREE from 'three';
-    import { OrbitControls } from 'https://unpkg.com/three@0.149.0/examples/jsm/controls/OrbitControls.js';
+<div id="info"></div>
 
-    // Scene & Camera
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.set(200, 100, 200);
-    camera.lookAt(0, 0, 0);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'https://unpkg.com/three@0.149.0/examples/jsm/controls/OrbitControls.js';
 
-    // Info Overlay
-    const infoDiv = document.getElementById('info');
-    function updateInfo() {
-      const p = camera.position;
-      infoDiv.textContent =
-        `FOV: ${camera.fov.toFixed(1)}°\n` +
-        `Aspect: ${camera.aspect.toFixed(2)}\n` +
-        `Position:\n  x: ${p.x.toFixed(1)}\n  y: ${p.y.toFixed(1)}\n  z: ${p.z.toFixed(1)}`;
-    }
+/* -------------------------------------------------
+   Core setup
+------------------------------------------------- */
+const scene   = new THREE.Scene();
+const camera  = new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0.1,3000);
+camera.position.set(200,100,200);
 
-    // Stars
-    const starGeo = new THREE.BufferGeometry();
-    const starVerts = [];
-    for (let i = 0; i < 1000; i++) {
-      starVerts.push(
-        THREE.MathUtils.randFloatSpread(1000),
-        THREE.MathUtils.randFloatSpread(1000),
-        THREE.MathUtils.randFloatSpread(1000)
-      );
-    }
-    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
-    scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1 })));
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
 
-    // Asteroid Belts (animated point clouds, slight Y-randomness for thickness)
-    const belts = [];
-    function addAsteroidBelt(innerR, outerR, count, color, size, speed) {
-      const geom = new THREE.BufferGeometry();
-      const verts = [];
-      for (let i = 0; i < count; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const r = THREE.MathUtils.randFloat(innerR, outerR);
-        const x = r * Math.cos(angle);
-        const z = r * Math.sin(angle);
-        const y = THREE.MathUtils.randFloatSpread(2);  // ±1 unit of vertical randomness
-        verts.push(x, y, z);
-      }
-      geom.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-      const points = new THREE.Points(geom, new THREE.PointsMaterial({ color, size }));
-      scene.add(points);
-      belts.push({ points, speed });
-    }
-    addAsteroidBelt(40,  50, 1500, 0x888888, 0.5, 0.002);
-    addAsteroidBelt(110, 130, 2000, 0xbbbbbb, 0.7, 0.001);
+const controls = new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=.05;
 
-    // Sun & Lighting
-    scene.add(new THREE.AmbientLight(0x333333));
-    const sunLight = new THREE.PointLight(0xffffff, 2, 1000);
-    scene.add(sunLight);
-    const sun = new THREE.Mesh(
-      new THREE.SphereGeometry(10, 32, 32),
-      new THREE.MeshBasicMaterial({ color: 0xffff00 })
+/* -------------------------------------------------
+   Info overlay
+------------------------------------------------- */
+const info=document.getElementById('info');
+function updateInfo(){
+  const p=camera.position;
+  info.textContent=
+`FOV  : ${camera.fov.toFixed(1)}°
+Aspect: ${camera.aspect.toFixed(2)}
+Camera:
+  x: ${p.x.toFixed(1)}
+  y: ${p.y.toFixed(1)}
+  z: ${p.z.toFixed(1)}`;
+}
+
+/* -------------------------------------------------
+   Background stars
+------------------------------------------------- */
+{
+  const g=new THREE.BufferGeometry();
+  const v=[];
+  for(let i=0;i<1000;i++){
+    v.push(
+      THREE.MathUtils.randFloatSpread(1000),
+      THREE.MathUtils.randFloatSpread(1000),
+      THREE.MathUtils.randFloatSpread(1000)
     );
-    scene.add(sun);
-    sunLight.position.copy(sun.position);
+  }
+  g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:1})));
+}
 
-    // Planet Definitions (inclination in degrees)
-    const planetDefs = [ 
-      { name:'Mercury', size:1,  a:15,  b:15,  color:0xaaaaaa, speed:0.04,  inclination:  7.0 },
-      { name:'Venus',   size:2,  a:22,  b:22,  color:0xffa500, speed:0.015, inclination:  3.39 },
-      { name:'Earth',   size:2.5,a:30,  b:30,  color:0x0000ff, speed:0.01,  inclination:  0.0 },
-      { name:'Mars',    size:1.5,a:38,  b:38,  color:0xff0000, speed:0.008, inclination:  1.85 },
-      { name:'Jupiter', size:5,  a:55,  b:55,  color:0xffd27f, speed:0.002, inclination:  1.305 },
-      { name:'Saturn',  size:4,  a:70,  b:70,  color:0xffffb2, speed:0.0015,inclination:  2.485 },
-      { name:'Uranus',  size:3.5,a:85,  b:85,  color:0xadd8e6, speed:0.001, inclination:  0.772 },
-      { name:'Neptune', size:3.5,a:100, b:100, color:0x00008b, speed:0.0005,inclination:  1.77 }
-    ];
+/* -------------------------------------------------
+   Lights & Sun
+------------------------------------------------- */
+scene.add(new THREE.AmbientLight(0x333333));
+const sunLight=new THREE.PointLight(0xffffff,2,0,2);
+scene.add(sunLight);
 
-    // Label Sprite Utility
-    function createLabel(text) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 256; canvas.height = 64;
-      const ctx = canvas.getContext('2d');
-      ctx.font = '36px Arial';
-      ctx.fillStyle = 'white';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, 128, 32);
-      const tex = new THREE.CanvasTexture(canvas);
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
-      sprite.scale.set(12, 3, 1);
-      return sprite;
-    }
+const sunRadius=10;
+const sun=new THREE.Mesh(new THREE.SphereGeometry(sunRadius,32,32),
+                         new THREE.MeshBasicMaterial({color:0xffff00}));
+scene.add(sun);sunLight.position.copy(sun.position);
 
-    // Planets & Orbits
-    const planets = planetDefs.map(def => {
-      // planet mesh + label
-      const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(def.size, 32, 32),
-        new THREE.MeshLambertMaterial({ color: def.color })
-      );
-      const label = createLabel(def.name);
-      label.position.set(0, def.size + 2, 0);
-      mesh.add(label);
-      scene.add(mesh);
+/* Corona sprite */
+(function(){
+  const size=256,c=document.createElement('canvas');
+  c.width=c.height=size;
+  const ctx=c.getContext('2d');
+  const g=ctx.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
+  g.addColorStop(0,'rgba(255,255,220,1)');
+  g.addColorStop(.25,'rgba(255,200,80,.7)');
+  g.addColorStop(1,'rgba(255,200,80,0)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,size,size);
+  const tex=new THREE.CanvasTexture(c);
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({
+    map:tex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false
+  }));
+  sprite.scale.set(60,60,1);
+  sun.add(sprite);
+})();
 
-      // dashed, inclined orbit
-      const curve = new THREE.EllipseCurve(0, 0, def.a, def.b, 0, Math.PI * 2, false);
-      const pts = curve.getPoints(128);
-      const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      // compute line distances for dash
-      const posArr = geo.attributes.position.array;
-      const ld = new Float32Array(posArr.length / 3);
-      let acc = 0;
-      ld[0] = 0;
-      for (let i = 1; i < ld.length; i++) {
-        const idx = i * 3, idxm = (i - 1) * 3;
-        const dx = posArr[idx]     - posArr[idxm];
-        const dz = posArr[idx + 2] - posArr[idxm + 2];
-        acc += Math.hypot(dx, dz);
-        ld[i] = acc;
-      }
-      geo.setAttribute('lineDistance', new THREE.BufferAttribute(ld, 1));
-      const mat = new THREE.LineDashedMaterial({ color:0xffffff, dashSize:1, gapSize:1 });
-      const orbit = new THREE.LineLoop(geo, mat);
-      // rotate into XZ plane and tilt by inclination
-      orbit.rotation.x = -Math.PI / 2 + THREE.MathUtils.degToRad(def.inclination);
-      scene.add(orbit);
+/* -------------------------------------------------
+   Heliosphere bubble & labels
+------------------------------------------------- */
+const HELIO_RADIUS=120;
 
-      return { mesh, angle: Math.random() * Math.PI * 2, def };
-    });
+const heliosphere=new THREE.Mesh(
+  new THREE.SphereGeometry(HELIO_RADIUS,64,64),
+  new THREE.MeshBasicMaterial({
+    color:0x99bbff,opacity:.15,transparent:true,
+    side:THREE.BackSide,blending:THREE.AdditiveBlending,depthWrite:false
+  })
+);
+scene.add(heliosphere);
 
-    // Saturn's Ring
-    const sat = planets.find(p => p.def.name === 'Saturn');
-    if (sat) {
-      const innerR = sat.def.size + 1;
-      const outerR = sat.def.size + 2.5;
-      const ringGeo = new THREE.RingGeometry(innerR, outerR, 64);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color:      0x999999,
-        side:       THREE.DoubleSide,
-        transparent:true,
-        opacity:    0.5
-      });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = -Math.PI / 2;
-      sat.mesh.add(ring);
-    }
+/* Ring helper */
+function dashedRing(radius,color){
+  const curve=new THREE.EllipseCurve(0,0,radius,radius,0,Math.PI*2,false);
+  const pts=curve.getPoints(256);
+  const geo=new THREE.BufferGeometry().setFromPoints(pts);
+  // line distances
+  const pos=geo.attributes.position.array;
+  const dist=new Float32Array(pos.length/3);
+  let acc=0;dist[0]=0;
+  for(let i=1;i<dist.length;i++){
+    const i3=i*3,im3=(i-1)*3;
+    const dx=pos[i3]-pos[im3],dz=pos[i3+2]-pos[im3+2];
+    acc+=Math.hypot(dx,dz);dist[i]=acc;
+  }
+  geo.setAttribute('lineDistance',new THREE.BufferAttribute(dist,1));
+  const mat=new THREE.LineDashedMaterial({color,dashSize:3,gapSize:2});
+  const ring=new THREE.LineLoop(geo,mat);
+  ring.rotation.x=-Math.PI/2;
+  scene.add(ring);
+  return ring;
+}
+/* Termination Shock (inner) & Bow Wave (outer) */
+dashedRing(HELIO_RADIUS*0.75,0x555555);
+dashedRing(HELIO_RADIUS*1.1 ,0x3a3a3a);
 
-    // Animation Loop
-    function animate() {
-      requestAnimationFrame(animate);
+/* Label utility */
+function makeLabel(text){
+  const canvas=document.createElement('canvas');
+  canvas.width=256;canvas.height=64;
+  const ctx=canvas.getContext('2d');
+  ctx.font='36px Arial';ctx.fillStyle='#fff';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(text,128,32);
+  const tex=new THREE.CanvasTexture(canvas);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true}));
+  sp.scale.set(22,5,1);
+  return sp;
+}
 
-      // move planets on their tilted orbits
-      planets.forEach(p => {
-        p.angle += p.def.speed;
-        const x0 = p.def.a * Math.cos(p.angle);
-        const z0 = p.def.b * Math.sin(p.angle);
-        const inc = THREE.MathUtils.degToRad(p.def.inclination);
-        const y  = z0 * Math.sin(inc);
-        const z  = z0 * Math.cos(inc);
-        p.mesh.position.set(x0, y, z);
-      });
+/* Heliosphere, Termination Shock, Bow Wave labels */
+const heliLabel=makeLabel('Heliosphere');
+heliLabel.position.set(0,HELIO_RADIUS*0.02,HELIO_RADIUS+5);
+scene.add(heliLabel);
 
-      // rotate belts
-      belts.forEach(b => b.points.rotation.y -= b.speed);
+const tsLabel=makeLabel('Termination Shock');
+tsLabel.position.set(0,HELIO_RADIUS*0.02,HELIO_RADIUS*0.75+5);
+scene.add(tsLabel);
 
-      controls.update();
-      renderer.render(scene, camera);
-      updateInfo();
-    }
-    animate();
+const bwLabel=makeLabel('Bow Wave');
+bwLabel.position.set(-HELIO_RADIUS*1.1-10,0,0);
+bwLabel.rotation.y=Math.PI/2;
+scene.add(bwLabel);
 
-    // Handle resize
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth/window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      updateInfo();
-    });
-  </script>
+/* -------------------------------------------------
+   Procedural textures
+------------------------------------------------- */
+const makeCanvas=s=>{const c=document.createElement('canvas');c.width=c.height=s;return c;};
+
+function texGas(def){
+  const c=makeCanvas(256),ctx=c.getContext('2d');
+  const g=ctx.createLinearGradient(0,0,0,c.height);
+  g.addColorStop(0,def.base);g.addColorStop(1,def.accent);
+  ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);
+  ctx.globalAlpha=.25;
+  for(let y=0;y<c.height;y+=8){
+    ctx.fillStyle=Math.random()>.5?def.base:def.accent;
+    ctx.fillRect(0,y,c.width,4);
+  }
+  return new THREE.CanvasTexture(c);
+}
+function texRocky(def){
+  const c=makeCanvas(256),ctx=c.getContext('2d');
+  ctx.fillStyle=def.base;ctx.fillRect(0,0,c.width,c.height);
+  for(let i=0;i<60000;i++){
+    ctx.fillStyle=Math.random()>.5?def.accent:'#00000022';
+    ctx.fillRect(Math.random()*c.width,Math.random()*c.height,1,1);
+  }
+  return new THREE.CanvasTexture(c);
+}
+function texIce(def){
+  const c=makeCanvas(256),ctx=c.getContext('2d');
+  const g=ctx.createLinearGradient(0,0,0,c.height);
+  g.addColorStop(0,def.accent);g.addColorStop(1,def.base);
+  ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);
+  ctx.globalAlpha=.15;
+  for(let y=0;y<c.height;y+=4){
+    ctx.fillStyle='#fff';ctx.fillRect(0,y,c.width,2);
+  }
+  return new THREE.CanvasTexture(c);
+}
+function texEarth(def){
+  const c=makeCanvas(256),ctx=c.getContext('2d');
+  ctx.fillStyle=def.base;ctx.fillRect(0,0,c.width,c.height);
+  for(let i=0;i<200;i++){
+    const x=Math.random()*c.width,y=Math.random()*c.height,r=Math.random()*20+10;
+    ctx.fillStyle=i%3?def.accent:'#967444';
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=.3;ctx.fillStyle='#fff';
+  for(let i=0;i<400;i++){
+    const x=Math.random()*c.width,y=Math.random()*c.height;
+    ctx.beginPath();ctx.arc(x,y,Math.random()*3+1,0,Math.PI*2);ctx.fill();
+  }
+  return new THREE.CanvasTexture(c);
+}
+function makeTex(def){
+  let t;
+  switch(def.type){
+    case'gas':t=texGas(def);break;
+    case'ice':t=texIce(def);break;
+    case'earth':t=texEarth(def);break;
+    default:t=texRocky(def);
+  }
+  t.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+
+/* -------------------------------------------------
+   Planet definitions & creation
+------------------------------------------------- */
+const planetDefs=[
+  {name:'Mercury',type:'rocky', size:1,  a:15,b:15, base:'#8a7d75',accent:'#5c524e', speed:0.04,  inc:7.0,  tilt:0.03, rot:0.02},
+  {name:'Venus',  type:'rocky', size:2,  a:22,b:22, base:'#d9b38c',accent:'#8e7458', speed:0.015, inc:3.39, tilt:177.4,rot:-0.004},
+  {name:'Earth',  type:'earth', size:2.5,a:30,b:30, base:'#2a84d2',accent:'#3e8f4e', speed:0.01,  inc:0,    tilt:23.5, rot:0.05},
+  {name:'Mars',   type:'rocky', size:1.5,a:38,b:38, base:'#b44a32',accent:'#72301f', speed:0.008, inc:1.85, tilt:25,  rot:0.048},
+  {name:'Jupiter',type:'gas',   size:5,  a:55,b:55, base:'#d2b48c',accent:'#b2896b', speed:0.002, inc:1.305,tilt:3.1, rot:0.15},
+  {name:'Saturn', type:'gas',   size:4,  a:70,b:70, base:'#f5deb3',accent:'#c2a57e', speed:0.0015,inc:2.485,tilt:26.7,rot:0.04}, // slowed spin
+  {name:'Uranus', type:'ice',   size:3.5,a:85,b:85, base:'#8ad6e6',accent:'#73c6d8', speed:0.001, inc:0.772,tilt:97.8,rot:0.1 },
+  {name:'Neptune',type:'ice',   size:3.5,a:100,b:100,base:'#4169e1',accent:'#3558c7', speed:0.0005,inc:1.77, tilt:28.3,rot:0.09}
+];
+
+const planets=[];
+planetDefs.forEach(def=>{
+  const tex=makeTex(def);
+  const mesh=new THREE.Mesh(
+    new THREE.SphereGeometry(def.size,32,32),
+    new THREE.MeshLambertMaterial({map:tex})
+  );
+  mesh.rotation.z=THREE.MathUtils.degToRad(def.tilt);
+  scene.add(mesh);
+
+  // label (independent sprite)
+  const label=makeLabel(def.name);
+  scene.add(label);
+
+  // inclined orbit (dashed)
+  const curve=new THREE.EllipseCurve(0,0,def.a,def.b,0,Math.PI*2,false);
+  const pts=curve.getPoints(128),geo=new THREE.BufferGeometry().setFromPoints(pts);
+  const pos=geo.attributes.position.array,dist=new Float32Array(pos.length/3);
+  let acc=0;dist[0]=0;
+  for(let i=1;i<dist.length;i++){
+    const i3=i*3,im3=(i-1)*3;
+    const dx=pos[i3]-pos[im3],dz=pos[i3+2]-pos[im3+2];
+    acc+=Math.hypot(dx,dz);dist[i]=acc;
+  }
+  geo.setAttribute('lineDistance',new THREE.BufferAttribute(dist,1));
+  const orbit=new THREE.LineLoop(geo,new THREE.LineDashedMaterial({color:0xffffff,dashSize:1,gapSize:1}));
+  orbit.rotation.x=-Math.PI/2+THREE.MathUtils.degToRad(def.inc);
+  scene.add(orbit);
+
+  planets.push({def,mesh,label,angle:Math.random()*Math.PI*2});
+});
+
+/* Saturn ring */
+{
+  const sat=planets.find(p=>p.def.name==='Saturn');
+  const inner=sat.def.size+1,outer=sat.def.size+2.5;
+  const ring=new THREE.Mesh(
+    new THREE.RingGeometry(inner,outer,64),
+    new THREE.MeshBasicMaterial({color:0x999999,side:THREE.DoubleSide,transparent:true,opacity:.5})
+  );
+  ring.rotation.x=-Math.PI/2;
+  sat.mesh.add(ring);
+}
+
+/* -------------------------------------------------
+   Asteroid belts (points)
+------------------------------------------------- */
+const belts=[];
+function addBelt(r1,r2,count,color,size,speed){
+  const g=new THREE.BufferGeometry(),v=[];
+  for(let i=0;i<count;i++){
+    const ang=Math.random()*Math.PI*2,r=THREE.MathUtils.randFloat(r1,r2);
+    v.push(r*Math.cos(ang),THREE.MathUtils.randFloatSpread(3),r*Math.sin(ang));
+  }
+  g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+  const points=new THREE.Points(g,new THREE.PointsMaterial({color,size}));
+  scene.add(points);belts.push({points,speed});
+}
+addBelt(40,50,1500,0x888888,.5,0.002);
+addBelt(110,130,2000,0xbbbbbb,.7,0.001);
+
+/* -------------------------------------------------
+   Interstellar wind streaks
+------------------------------------------------- */
+const WIND_COUNT=60,WIND_SPEED=.6,windSprites=[];
+(function initWind(){
+  const size=64,c=makeCanvas(size),ctx=c.getContext('2d');
+  ctx.strokeStyle='rgba(120,170,255,.6)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(0,size/2);ctx.lineTo(size,size/2);ctx.stroke();
+  const tex=new THREE.CanvasTexture(c);
+  for(let i=0;i<WIND_COUNT;i++){
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({
+      map:tex,transparent:true,depthWrite:false
+    }));
+    sp.scale.set(8,1.5,1);
+    resetWind(sp,true);
+    scene.add(sp);windSprites.push(sp);
+  }
+})();
+function resetWind(sp,initial=false){
+  const R=HELIO_RADIUS*1.5;
+  sp.position.set(-R-THREE.MathUtils.randFloat(0,60),
+                  THREE.MathUtils.randFloatSpread(R*1.2),
+                  THREE.MathUtils.randFloatSpread(R*1.2));
+  if(initial) sp.position.x+=THREE.MathUtils.randFloat(0,R*2); // spread out
+}
+
+/* -------------------------------------------------
+   Comets
+------------------------------------------------- */
+const COMET_COUNT=3,comets=[];
+(function initComets(){
+  const size=64,c=makeCanvas(size),ctx=c.getContext('2d');
+  const g=ctx.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
+  g.addColorStop(0,'rgba(255,255,255,1)');
+  g.addColorStop(.4,'rgba(255,255,255,.6)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,size,size);
+  const tex=new THREE.CanvasTexture(c);
+  for(let i=0;i<COMET_COUNT;i++){
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true}));
+    sp.scale.set(4,4,1);
+    resetComet(sp,true);
+    scene.add(sp);
+    comets.push(sp);
+  }
+})();
+function resetComet(sp,initial=false){
+  const R=HELIO_RADIUS*1.7;
+  const dir=new THREE.Vector3(-1,THREE.MathUtils.randFloat(-.1,.1),THREE.MathUtils.randFloat(-.2,.2)).normalize();
+  sp.userData.vel=dir.multiplyScalar(.8+Math.random()*0.4);
+  sp.position.set(R,THREE.MathUtils.randFloatSpread(R),THREE.MathUtils.randFloatSpread(R));
+  if(initial) sp.position.x-=Math.random()*R*2; // distribute
+}
+
+/* -------------------------------------------------
+   Animation loop
+------------------------------------------------- */
+const clock=new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=clock.getDelta();
+
+  /* Planets */
+  planets.forEach(p=>{
+    p.angle+=p.def.speed;
+    const x0=p.def.a*Math.cos(p.angle),z0=p.def.b*Math.sin(p.angle);
+    const inc=THREE.MathUtils.degToRad(p.def.inc);
+    const y=z0*Math.sin(inc),z=z0*Math.cos(inc);
+    p.mesh.position.set(x0,y,z);
+    p.mesh.rotation.y+=p.def.rot;
+
+    /* label follows planet & faces camera */
+    p.label.position.copy(p.mesh.position).add(new THREE.Vector3(0,p.def.size+2,0));
+    p.label.lookAt(camera.position);
+  });
+
+  /* Asteroid belts spin */
+  belts.forEach(b=>b.points.rotation.y-=b.speed);
+
+  /* Wind sprites */
+  windSprites.forEach(sp=>{
+    sp.position.x+=WIND_SPEED*dt*60;
+    if(sp.position.x>HELIO_RADIUS+60) resetWind(sp);
+  });
+
+  /* Comets */
+  comets.forEach(sp=>{
+    sp.position.addScaledVector(sp.userData.vel,dt*60);
+    if(sp.position.lengthSq()>Math.pow(HELIO_RADIUS*1.9,2)) resetComet(sp);
+  });
+
+  /* Heliosphere subtle yaw */
+  heliosphere.rotation.y+=0.00004;
+
+  controls.update();
+  renderer.render(scene,camera);
+  updateInfo();
+}
+animate();
+
+/* -------------------------------------------------
+   Resize
+------------------------------------------------- */
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+  updateInfo();
+});
+</script>
 </body>
 </html>

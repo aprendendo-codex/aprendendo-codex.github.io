@@ -1,0 +1,4035 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Emoji Tower Defense</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px;
+      font-family: "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 50% 15%, #15273f, #050b13 70%);
+      color: #edf5ff;
+    }
+
+    .layout {
+      display: flex;
+      gap: 28px;
+      align-items: flex-start;
+      width: min(1180px, 100%);
+    }
+
+    .hud {
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      background: rgba(7, 17, 34, 0.85);
+      border: 1px solid rgba(103, 173, 255, 0.22);
+      border-radius: 16px;
+      padding: 18px 18px 22px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.48);
+      backdrop-filter: blur(4px);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      font-weight: 600;
+    }
+
+    .stat-line {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 6px;
+      border: 1px solid rgba(120, 160, 255, 0.22);
+      border-radius: 10px;
+      background: rgba(10, 23, 48, 0.46);
+      min-height: 64px;
+    }
+
+    .stat-line .label {
+      font-size: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stat-line .label .icon {
+      font-size: 20px;
+      line-height: 20px;
+    }
+
+    .stat-line>span:last-child {
+      font-size: 14px;
+      margin-top: 6px;
+    }
+
+    .section {
+      border: 1px solid rgba(120, 160, 255, 0.22);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(10, 23, 48, 0.46);
+    }
+
+    .section-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: rgba(214, 230, 255, 0.72);
+      margin-bottom: 8px;
+    }
+
+    .section .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Icon-only grids for build and troops */
+    .section .buttons.icon-grid {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .icon-btn {
+      position: relative;
+      width: 56px;
+      height: 56px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+    }
+
+    .icon-btn .price-tag {
+      position: absolute;
+      right: -6px;
+      bottom: -6px;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      background: rgba(14, 30, 64, 0.9);
+      border: 1px solid rgba(130, 170, 255, 0.45);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Compact tactics buttons */
+    .tactics-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .small-btn {
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
+    .hud-right {
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      background: rgba(7, 17, 34, 0.85);
+      border: 1px solid rgba(103, 173, 255, 0.22);
+      border-radius: 16px;
+      padding: 18px 18px 22px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.48);
+      backdrop-filter: blur(4px);
+    }
+
+    button {
+      cursor: pointer;
+      border: 1px solid rgba(153, 186, 255, 0.35);
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(82, 125, 244, 0.8), rgba(69, 104, 220, 0.8));
+      color: #f2f5ff;
+      font-weight: 600;
+      padding: 9px 12px;
+      font-size: 14px;
+      transition: transform 0.1s ease, filter 0.25s ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      filter: grayscale(0.35);
+    }
+
+    .build-selected {
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3) inset, 0 0 14px rgba(110, 170, 255, 0.7);
+    }
+
+    #log {
+      height: 130px;
+      overflow-y: auto;
+      background: rgba(6, 16, 34, 0.65);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: rgba(229, 240, 255, 0.88);
+    }
+
+    #log div+div {
+      margin-top: 6px;
+    }
+
+    .field {
+      position: relative;
+      width: 440px;
+      height: 720px;
+      background: radial-gradient(circle at 50% 12%, #12243a, #050a14 74%);
+      border-radius: 22px;
+      border: 1px solid rgba(84, 140, 220, 0.35);
+      overflow: hidden;
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.55);
+    }
+
+    .field * {
+      user-select: none;
+    }
+
+    .path {
+      position: absolute;
+      inset: 0;
+      margin: 0 auto;
+      width: 224px;
+      background: rgba(42, 64, 92, 0.78);
+      border-left: 2px solid rgba(2, 8, 20, 0.4);
+      border-right: 2px solid rgba(2, 8, 20, 0.4);
+      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.55);
+      z-index: 1;
+      background-image:
+        linear-gradient(rgba(22, 36, 62, 0.65), rgba(22, 36, 62, 0.65)),
+        linear-gradient(90deg, rgba(15, 78, 160, 0.3) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(15, 78, 160, 0.25) 1px, transparent 1px);
+      background-size: 100% 100%, 28px 28px, 28px 28px;
+    }
+
+    .path::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 0;
+      width: 4px;
+      height: 100%;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, rgba(185, 214, 255, 0.18), rgba(61, 109, 182, 0.08));
+      pointer-events: none;
+    }
+
+    .base {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 28px;
+      padding: 10px 18px;
+      border-radius: 12px;
+      background: rgba(16, 26, 48, 0.82);
+      border: 1px solid rgba(105, 160, 240, 0.4);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+      z-index: 7;
+    }
+
+    .base span:last-child {
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .entity {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .slot {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 2px dashed rgba(150, 188, 255, 0.42);
+      color: rgba(180, 208, 255, 0.74);
+      font-size: 24px;
+      cursor: pointer;
+      background: rgba(12, 30, 58, 0.45);
+      transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+      z-index: 3;
+    }
+
+    .slot:hover {
+      background: rgba(40, 80, 130, 0.48);
+      transform: translate(-50%, -50%) scale(1.02);
+      border-color: rgba(210, 230, 255, 0.7);
+    }
+
+    .tower {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(18, 40, 76, 0.82);
+      border: 2px solid rgba(122, 172, 255, 0.48);
+      font-size: 30px;
+      z-index: 4;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .tower.selected {
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35), 0 0 22px rgba(115, 172, 255, 0.68);
+      transform: translate(-50%, -50%) scale(1.05);
+    }
+
+    .tower .level {
+      position: absolute;
+      right: 4px;
+      bottom: 2px;
+      font-size: 11px;
+      color: rgba(224, 238, 255, 0.82);
+      letter-spacing: 0.05em;
+    }
+
+    .enemy,
+    .soldier {
+      width: 40px;
+      height: 40px;
+      font-size: 28px;
+    }
+
+    .enemy {
+      z-index: 6;
+    }
+
+    .soldier {
+      z-index: 5;
+    }
+
+    .soldier .level {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(34, 56, 92, 0.85);
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 11px;
+      color: rgba(224, 238, 255, 0.82);
+      letter-spacing: 0.05em;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .enemy .health,
+    .soldier .health {
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      width: 40px;
+      height: 4px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.10);
+      transform: translateX(-50%);
+      overflow: hidden;
+    }
+
+    /* Hide soldier bars in-field; we use compact dots near level instead */
+    .soldier .health,
+    .soldier .mana {
+      display: none;
+    }
+
+    /* Mana bar below health for troops with mana */
+    .soldier .mana {
+      position: absolute;
+      bottom: -16px;
+      left: 50%;
+      width: 40px;
+      height: 4px;
+      border-radius: 3px;
+      background: rgba(200, 150, 255, 0.14);
+      transform: translateX(-50%);
+      overflow: hidden;
+    }
+
+    .soldier .mana span {
+      display: block;
+      height: 100%;
+      width: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, rgba(166, 120, 255, 0.72), rgba(126, 75, 255, 0.72));
+    }
+
+    .enemy .health span,
+    .soldier .health span {
+      display: block;
+      height: 100%;
+    }
+
+    .enemy .health span {
+      background: linear-gradient(90deg, rgba(255, 86, 120, 0.75), rgba(255, 163, 75, 0.75));
+    }
+
+    .soldier .health span {
+      background: linear-gradient(90deg, rgba(112, 255, 178, 0.7), rgba(120, 255, 230, 0.7));
+    }
+
+    /* Compact dot indicators beside level */
+    .soldier .dots {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .soldier .dots .hp-dot,
+    .soldier .dots .mp-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      opacity: 1;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+    }
+
+    .soldier .dots .hp-dot {
+      background: linear-gradient(90deg, rgba(112, 255, 178, 0.9), rgba(120, 255, 230, 0.9));
+    }
+
+    .soldier .dots .mp-dot {
+      background: linear-gradient(90deg, rgba(166, 120, 255, 0.9), rgba(126, 75, 255, 0.9));
+    }
+
+    .soldier.low-health {
+      filter: saturate(1.5) hue-rotate(-20deg) drop-shadow(0 0 8px rgba(255, 60, 60, 0.55));
+    }
+
+    .soldier.healed {
+      filter: drop-shadow(0 0 10px rgba(80, 255, 140, 0.8)) saturate(1.15);
+      transition: filter 0.3s ease;
+    }
+
+    .enemy.shocked {
+      animation: shockJitter 0.22s infinite alternate;
+      filter: hue-rotate(25deg) brightness(1.1);
+    }
+
+    .enemy.boss {
+      width: 56px;
+      height: 56px;
+      font-size: 36px;
+    }
+
+    .enemy.boss .health {
+      width: 52px;
+    }
+
+    .status-badge {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 18px;
+      filter: drop-shadow(0 0 6px rgba(120, 200, 255, 0.65));
+      animation: statusPulse 0.6s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    @keyframes statusPulse {
+      0% {
+        opacity: 0.45;
+        transform: translateX(-50%) scale(0.9);
+      }
+
+      100% {
+        opacity: 0.95;
+        transform: translateX(-50%) scale(1.1);
+      }
+    }
+
+    @keyframes shockJitter {
+      0% {
+        transform: translate(-50%, -50%) translate(-2px, -2px);
+      }
+
+      100% {
+        transform: translate(-50%, -50%) translate(2px, 2px);
+      }
+    }
+
+    .projectile {
+      width: 26px;
+      height: 26px;
+      font-size: 22px;
+      pointer-events: none;
+      z-index: 9;
+      filter: drop-shadow(0 0 6px rgba(155, 195, 255, 0.5));
+    }
+
+    .effect {
+      font-size: 22px;
+      pointer-events: none;
+      opacity: 0.9;
+      z-index: 10;
+      animation: pop 0.5s ease-out forwards;
+    }
+
+    @keyframes pop {
+      0% {
+        transform: translate(-50%, -50%) scale(0.6);
+        opacity: 0.9;
+      }
+
+      100% {
+        transform: translate(-50%, -50%) scale(1.35);
+        opacity: 0;
+      }
+    }
+    /* Afterimage for boomerang */
+    .afterimage { font-size: 14px; pointer-events:none; opacity:0.6; z-index:11; animation: trailFade .35s ease-out forwards; }
+    @keyframes trailFade {
+      0% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+      100% { transform: translate(-50%, -50%) translateY(2px) scale(0.95); opacity: 0; }
+    }
+
+    /* Boss aura */
+    .enemy.boss::after,
+    .enemy.wraith::after {
+      content: "";
+      position: absolute;
+      width: 150%;
+      height: 150%;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      left: 50%;
+      top: 50%;
+      background: radial-gradient(circle, rgba(255, 215, 0, 0.18), rgba(255, 215, 0, 0) 60%);
+      pointer-events: none;
+      filter: blur(2px);
+      animation: bossAura 1.6s ease-in-out infinite alternate;
+    }
+
+    @keyframes bossAura {
+      0% {
+        opacity: 0.45;
+        transform: translate(-50%, -50%) scale(1.0);
+      }
+
+      100% {
+        opacity: 0.9;
+        transform: translate(-50%, -50%) scale(1.15);
+      }
+    }
+
+    /* RIP fade effect for fallen troops */
+    .rip-effect {
+      font-size: 18px;
+      pointer-events: none;
+      opacity: 0.95;
+      z-index: 10;
+      animation: ripFade 1.6s ease-out forwards;
+    }
+
+    @keyframes ripFade {
+      0% {
+        transform: translate(-50%, -50%) translateY(0) scale(0.9);
+        opacity: 0.9;
+      }
+
+      100% {
+        transform: translate(-50%, -50%) translateY(-12px) scale(1);
+        opacity: 0;
+      }
+    }
+
+    /* Coin drop effect */
+    .coin {
+      font-size: 16px;
+      pointer-events: none;
+      opacity: 0.95;
+      z-index: 12;
+      animation: coinFall 0.9s ease-out forwards;
+    }
+
+    @keyframes coinFall {
+      0% {
+        transform: translate(-50%, -50%) translateY(-6px);
+        opacity: 0.95;
+      }
+
+      100% {
+        transform: translate(-50%, -50%) translateY(18px);
+        opacity: 0;
+      }
+    }
+
+    /* RIP fade effect for fallen troops */
+    .rip-effect {
+      font-size: 18px;
+      pointer-events: none;
+      opacity: 0.95;
+      z-index: 10;
+      animation: ripFade 1.6s ease-out forwards;
+    }
+
+    @keyframes ripFade {
+      0% {
+        transform: translate(-50%, -50%) translateY(0) scale(0.9);
+        opacity: 0.9;
+      }
+
+      100% {
+        transform: translate(-50%, -50%) translateY(-12px) scale(1);
+        opacity: 0;
+      }
+    }
+
+    .range-overlay {
+      position: absolute;
+      border: 2px dashed rgba(120, 180, 255, 0.45);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 2;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(80, 140, 255, 0.12), transparent 65%);
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: rgba(4, 12, 24, 0.82);
+      backdrop-filter: blur(7px);
+      color: #f0f6ff;
+      font-size: 26px;
+      letter-spacing: 0.05em;
+      z-index: 20;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .inspector {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .inspector strong {
+      font-size: 16px;
+    }
+
+    .inspector-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .inspector-buttons button {
+      flex: 1;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: rgba(210, 228, 255, 0.7);
+    }
+
+    .build-info {
+      font-size: 13px;
+      color: rgba(216, 230, 255, 0.76);
+      line-height: 1.45;
+    }
+
+    /* Troop mini panel (grid) */
+    .troop-panel {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    /* Troops title row with per-type counters */
+    .section-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .section-title-row .section-title { margin: 0; }
+    .troop-title-icons {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(214, 230, 255, 0.82);
+    }
+    .troop-title-icons .type {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    /* 40% of minicard icon size (22px) ~ 9px */
+    .troop-title-icons .icon {
+      font-size: 9px;
+      line-height: 1;
+      filter: drop-shadow(0 0 2px rgba(0,0,0,0.35));
+    }
+    .troop-title-icons .count {
+      font-size: 12px;
+      letter-spacing: 0.03em;
+    }
+
+    .troop-tile {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 4px;
+      border: 1px solid rgba(120, 160, 255, 0.22);
+      border-radius: 10px;
+      background: rgba(12, 30, 58, 0.35);
+      min-height: 64px;
+    }
+
+    .troop-emoji {
+      font-size: 22px;
+      line-height: 22px;
+    }
+
+    .bar {
+      position: relative;
+      height: 4px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.12);
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .bar span {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      border-radius: 3px;
+      display: block;
+    }
+
+    .bar.health span {
+      background: linear-gradient(90deg, rgba(112, 255, 178, 0.8), rgba(120, 255, 230, 0.8));
+    }
+
+    .bar.mana span {
+      background: linear-gradient(90deg, rgba(166, 120, 255, 0.82), rgba(126, 75, 255, 0.82));
+    }
+
+    .tile-actions {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      display: none;
+      gap: 4px;
+      z-index: 5;
+    }
+
+    .troop-tile {
+      overflow: visible;
+      position: relative;
+    }
+
+    .troop-level {
+      position: relative;
+    }
+
+    .dismiss-btn {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.12s ease;
+    }
+
+    .troop-tile:hover .dismiss-btn,
+    .troop-tile:focus-within .dismiss-btn {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .troop-tile.pending .tile-actions {
+      display: flex;
+    }
+
+    .troop-tile.pending .dismiss-btn {
+      display: none;
+    }
+
+    .tiny-btn {
+      cursor: pointer;
+      border: 1px solid rgba(153, 186, 255, 0.35);
+      background: rgba(30, 50, 90, 0.9);
+      color: #f2f5ff;
+      border-radius: 6px;
+      padding: 0 5px;
+      font-size: 11px;
+      line-height: 16px;
+      height: 18px;
+    }
+
+    .troop-level {
+      font-size: 11px;
+      text-align: center;
+      color: rgba(220, 235, 255, 0.82);
+    }
+
+    .waves-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .toggle-btn {
+      cursor: pointer;
+      border: 1px solid rgba(153, 186, 255, 0.35);
+      border-radius: 18px;
+      padding: 6px 10px;
+      background: rgba(30, 50, 90, 0.6);
+      color: #f2f5ff;
+      font-weight: 600;
+      font-size: 12px;
+      transition: filter .2s ease, background .2s ease;
+    }
+
+    .toggle-btn.active {
+      background: linear-gradient(135deg, rgba(82, 125, 244, 0.85), rgba(69, 104, 220, 0.85));
+      filter: brightness(1.05);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <div class="hud">
+      <div class="stats">
+        <div class="stat-line"><span class="label"><span class="icon">🪙</span>Coins</span><span id="coins">0</span>
+        </div>
+        <div class="stat-line"><span class="label"><span class="icon">🌊</span>Wave</span><span id="wave">0</span></div>
+        <div class="stat-line"><span class="label"><span class="icon">🏰</span>Base HP</span><span id="baseHP">0</span>
+        </div>
+        <div class="stat-line"><span class="label"><span class="icon">👾</span>Mobs</span><span id="enemyCount">0</span>
+        </div>
+        <div class="stat-line"><span class="label"><span class="icon">🪖</span>Troops</span><span
+            id="troopCount">0</span></div>
+        <div class="stat-line"><span class="label"><span class="icon">💀</span>Kills</span><span id="killCount">0</span>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Build Towers</div>
+        <div class="buttons icon-grid">
+          <button data-build="arrow" class="icon-btn" title="Rapid arrows pierce the front line"></button>
+          <button data-build="cannon" class="icon-btn" title="Heavy bombs with splash impact"></button>
+          <button data-build="storm" class="icon-btn" title="Long-range lightning arcs"></button>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Reinforcements</div>
+        <div class="buttons icon-grid">
+          <button data-soldier="melee" class="icon-btn" title="Guardian: resilient melee defender"></button>
+          <button data-soldier="ranged" class="icon-btn" title="Arcanist: ranged support mage"></button>
+          <button data-soldier="healer" class="icon-btn" title="Healer: restorative support monk"></button>
+        </div>
+      </div>
+      <div id="buildInfo" class="section build-info">
+        Select a tower type to see its traits.
+      </div>
+      <div id="log" aria-live="polite"></div>
+      <div class="section" style="margin-top:10px;">
+        <div class="section-title">Console</div>
+        <div style="display:flex; gap:8px;">
+          <input id="consoleInput" type="text" placeholder="Enter command and press Enter"
+            style="flex:1; padding:8px; border-radius:8px; border:1px solid rgba(153,186,255,0.35); background: rgba(12,30,58,0.45); color:#edf5ff;" />
+          <button id="runConsoleButton">Run</button>
+        </div>
+      </div>
+    </div>
+    <div id="field" class="field">
+      <div class="path"></div>
+      <div id="rangeOverlay" class="range-overlay hidden"></div>
+      <div id="base" class="base"><span aria-hidden="true">🏯</span><span>Base</span></div>
+      <div id="overlay" class="overlay hidden">
+        <div>Base Destroyed</div>
+        <div id="finalStats"></div>
+        <button id="restartButton">Restart</button>
+      </div>
+      <!-- Difficulty selection shown at game start -->
+      <div id="difficultyOverlay" class="overlay">
+        <div style="font-size:28px; margin-bottom:6px;">Select Difficulty</div>
+        <div style="display:flex; gap:10px; margin-top:4px;">
+          <button data-difficulty="easy" title="Player damage 100%">Easy</button>
+          <button data-difficulty="normal" title="Player damage 50%">Normal</button>
+          <button data-difficulty="hard" title="Player damage 25%">Hard</button>
+        </div>
+        <div class="hint" style="margin-top:8px;">Easy = 100% dmg • Normal = 50% dmg • Hard = 25% dmg</div>
+      </div>
+    </div>
+    <div class="hud hud-right">
+      <div class="section inspector">
+        <strong id="inspectorName">Select a tower</strong>
+        <div id="inspectorDetails">Tap a tower on the path to inspect, upgrade, or sell it.</div>
+        <div class="hint" id="inspectorHint"></div>
+        <div class="inspector-buttons">
+          <button id="upgradeButton" disabled>Upgrade Tower</button>
+          <button id="sellButton" disabled>Sell Tower</button>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Tactics</div>
+        <div class="tactics-row">
+          <button id="forwardButton" class="small-btn" title="Advance towards visible enemies">Forward</button>
+          <button id="middleButton" class="small-btn build-selected" title="Hold the line near towers">Middle</button>
+          <button id="retreatButton" class="small-btn" title="Stay near the base">Retreat</button>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section">
+          <div id="wavesTitle" class="section-title">Waves</div>
+          <div class="waves-row">
+            <button id="autoToggle" class="toggle-btn" aria-pressed="false"
+              title="Automatically start the next wave when one ends">Auto</button>
+            <button id="speedToggle" class="toggle-btn" aria-pressed="false"
+              title="Run the game at faster speed">Faster</button>
+            <div style="flex:1"></div>
+            <button id="nextWaveButton">Start</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title-row">
+            <div class="section-title">Troops</div>
+            <div id="troopTitleIcons" class="troop-title-icons" aria-label="Troops per type"></div>
+          </div>
+          <div id="troopPanel" class="troop-panel" aria-label="Troop status list"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        "use strict";
+        const field = document.getElementById("field");
+        const overlay = document.getElementById("overlay");
+        const log = document.getElementById("log");
+        const coinsLabel = document.getElementById("coins");
+        const waveLabel = document.getElementById("wave");
+        const difficultyDisplay = document.getElementById("difficultyDisplay");
+        const difficultyShort = document.getElementById("difficultyShort");
+        const wavesTitle = document.getElementById("wavesTitle");
+        const baseLabel = document.getElementById("baseHP");
+        const enemyCountLabel = document.getElementById("enemyCount");
+        const troopCountLabel = document.getElementById("troopCount");
+        const killCountLabel = document.getElementById("killCount");
+        const buildButtons = Array.from(document.querySelectorAll("[data-build]"));
+        const soldierButtons = Array.from(document.querySelectorAll("[data-soldier]"));
+        const nextWaveButton = document.getElementById("nextWaveButton");
+        const autoToggleBtn = document.getElementById("autoToggle");
+        const upgradeButton = document.getElementById("upgradeButton");
+        const sellButton = document.getElementById("sellButton");
+        const forwardButton = document.getElementById("forwardButton");
+        const middleButton = document.getElementById("middleButton");
+        const retreatUIButton = document.getElementById("retreatButton");
+        const consoleInput = document.getElementById("consoleInput");
+        const runConsoleButton = document.getElementById("runConsoleButton");
+        const speedToggleBtn = document.getElementById("speedToggle");
+        const inspectorName = document.getElementById("inspectorName");
+        const inspectorDetails = document.getElementById("inspectorDetails");
+        const inspectorHint = document.getElementById("inspectorHint");
+        const buildInfo = document.getElementById("buildInfo");
+        const finalStats = document.getElementById("finalStats");
+        const restartButton = document.getElementById("restartButton");
+        const rangeOverlay = document.getElementById("rangeOverlay");
+        const difficultyOverlay = document.getElementById("difficultyOverlay");
+        const troopPanel = document.getElementById("troopPanel");
+        const troopTitleIcons = document.getElementById("troopTitleIcons");
+        const statsContainer = document.querySelector('.stats');
+
+        const FIELD_WIDTH = 440;
+        const FIELD_HEIGHT = 720;
+        const GRID_COLS = 8;
+        const TILE_SIZE = 28;
+        const PATH_WIDTH = GRID_COLS * TILE_SIZE; // 224px grid with 8 tiles
+        const PATH_LEFT = (FIELD_WIDTH - PATH_WIDTH) / 2;
+        // Visual path has 2px borders on each side; adjust for exact centering
+        const PATH_BORDER = 2;
+        const PATH_RIGHT = PATH_LEFT + PATH_WIDTH;
+        const PATH_CENTER = PATH_LEFT + PATH_WIDTH / 2;
+        const PATH_TOP_OFFSET = 96;
+        const BASE_Y = FIELD_HEIGHT - 58;
+        const CONVERGE_Y = BASE_Y - 150;
+        // Ranged units should stay safely behind the frontline guardians
+        const BACKLINE_MIN_FROM_BOTTOM_GUARDIAN = 44; // px below the bottom-most guardian
+
+        const SELL_REFUND_RATE = 0.65;
+        const STATUS_RESIST_DECAY_TIME = 5;
+        const STATUS_RESIST_STEP = 0.82;
+        const STATUS_RESIST_CAP = { default: 0.25, boss: 0.1 };
+        const CROWD_MIN_DISTANCE = 18;
+        const CROWD_SEPARATION_FORCE = 24;
+
+
+        const state = {
+          coins: 240,
+          wave: 0,
+          baseHealth: 140,
+          maxBaseHealth: 140,
+          autoNextWave: false,
+          totalKills: 0,
+          doubleSpeed: false,
+          difficulty: null, // 'easy' | 'normal' | 'hard'
+          playerDamageMultiplier: 1,
+          elapsedTime: 0,
+          cheatUsed: false,
+        };
+
+        let gameOver = false;
+        let pendingBuildType = null;
+        let selectedTowerId = null;
+        let idCounter = 0;
+        let waveActive = false;
+        let waveClock = 0;
+        let enemiesRemainingThisWave = 0;
+        let spawnQueue = [];
+        let hudTimeAccum = 0;
+
+        const tactics = {
+          mode: 'middle', // 'forward' | 'middle' | 'retreat'
+          retreatActive: false,
+          partialRetreat: false,
+        };
+
+        const towers = [];
+        const towerSlots = [];
+        const soldiers = [];
+        const enemies = [];
+        const projectiles = [];
+        let pendingDismissId = null;
+        const towerCatalog = {
+          arrow: {
+            key: "arrow",
+            name: "Arrow Tower",
+            emoji: "🏹",
+            cost: 80,
+            damage: 18,
+            range: 150,
+            fireRate: 0.9,
+            effect: "➶",
+            description: "Rapid arrows stick into the frontline. Balanced reach and damage.",
+            projectile: { emoji: "➴", speed: 420, hit: "💢" },
+          },
+          cannon: {
+            key: "cannon",
+            name: "Bomb Tower",
+            emoji: "💣",
+            cost: 120,
+            damage: 34,
+            range: 148,
+            fireRate: 1.45,
+            effect: "💥",
+            description: "Lobs heavy shells that burst on impact. Slow but devastating.",
+            projectile: { emoji: "💣", speed: 280, hit: "💥" },
+          },
+          storm: {
+            key: "storm",
+            name: "Storm Tower",
+            emoji: "⚡",
+            cost: 150,
+            damage: 22,
+            range: 190,
+            fireRate: 0.7,
+            effect: "⚡",
+            description: "Channels lightning bolts across long distances with blistering speed.",
+            projectile: { emoji: "⚡", speed: 520, hit: "⚡" },
+          },
+        };
+        const soldierCatalog = {
+          melee: {
+            key: "melee",
+            name: "Guardian",
+            emoji: "🛡️",
+            cost: 60,
+            health: 180,
+            speed: 100,
+            damage: 24,
+            attackRate: 0.8,
+            attackRange: 48,
+            isMelee: true,
+            effect: "🗡️",
+            attackHold: 0.3,
+            lowHealthThreshold: 0.35,
+            frenzyMultiplier: 0.72,
+            levelThresholds: [3, 9, 18],
+            levelBonuses: { health: 0.2, damage: 0.18, attackRate: 0.12 },
+          },
+          ranged: {
+            key: "ranged",
+            name: "Arcanist",
+            emoji: "🧙",
+            cost: 90,
+            health: 120,
+            speed: 96,
+            damage: 22,
+            attackRate: 0.82,
+            attackRange: 112,
+            isMelee: false,
+            effect: "✨",
+            attackHold: 0.26,
+            projectile: { emoji: "🔮", speed: 380, hit: "✨" },
+            comfortRatio: 0.7,
+            lowHealthThreshold: 0.4,
+            frenzyMultiplier: 0.68,
+            manaMax: 80,
+            manaRegen: 6,
+            attackManaCost: 4,
+            levelThresholds: [4, 11, 22],
+            levelBonuses: { health: 0.16, damage: 0.14, attackRate: 0.1, attackRange: 24 },
+          },
+          healer: {
+            key: "healer",
+            name: "Healer",
+            emoji: "💊",
+            cost: 110,
+            health: 140,
+            speed: 105,
+            damage: 0,
+            attackRate: 1.1,
+            attackRange: 0,
+            isMelee: false,
+            effect: "💫",
+            role: "healer",
+            healAmount: 32,
+            healRange: 84,
+            healCooldown: 1.15,
+            healThreshold: 0.75,
+            threatRadius: 120,
+            retreatBuffer: 190,
+            manaMax: 100,
+            manaRegen: 14,
+            healCost: 25,
+            slowCost: 38,
+            slowCooldown: 6,
+            slowRange: 220,
+            slowAmount: 0.42,
+            slowDuration: 2.6,
+            levelThresholds: [120, 280, 540],
+            levelBonuses: { health: 0.14, healAmount: 0.22, manaMax: 0.12, slowDuration: 0.18 },
+          },
+        };
+        const enemyCatalog = {
+          melee: {
+            key: "melee",
+            name: "Crawler",
+            emoji: "🧟",
+            health: 90,
+            speed: 44,
+            damage: 12,
+            attackRate: 1.25,
+            attackRange: 34,
+            reward: 20,
+            effect: "💢",
+            attackHold: 0.38,
+          },
+          ranged: {
+            key: "ranged",
+            name: "Slinger",
+            emoji: "🎯",
+            health: 75,
+            speed: 36,
+            damage: 11,
+            attackRate: 1.5,
+            attackRange: 190,
+            reward: 25,
+            effect: "🎯",
+            attackHold: 0.3,
+            projectile: { emoji: "🎯", speed: 320, hit: "💥" },
+          },
+          boss: {
+            key: "boss",
+            name: "Colossus",
+            emoji: "👹",
+            health: 640,
+            speed: 28,
+            damage: 28,
+            attackRate: 1.7,
+            attackRange: 210,
+            reward: 150,
+            effect: "🔥",
+            attackHold: 0.45,
+            projectile: { emoji: "🔥", speed: 340, hit: "🔥" },
+          },
+
+          wraith: {
+            key: "wraith",
+            name: "Wraith King",
+            emoji: "👻",
+            health: 520,
+            speed: 30,
+            damage: 22,
+            attackRate: 1.6,
+            attackRange: 230,
+            reward: 180,
+            effect: "✨",
+            attackHold: 0.42,
+            projectile: { emoji: "🌀", speed: 360, hit: "✨" }
+          }
+        };
+        // Keep only the 4 rows of slots in the lower part (near the base)
+        const slotRows = [10, 12, 14, 16];
+        // Centered three columns around the path center with 2-tile spacing to avoid overlap
+        const slotCols = [-2, 0, 2];
+
+        slotRows.forEach((row) => {
+          slotCols.forEach((col) => {
+            const slotEl = document.createElement("div");
+            slotEl.className = "slot entity";
+            slotEl.dataset.row = String(row);
+            slotEl.dataset.col = String(col);
+            slotEl.textContent = "➕";
+            const slotX = PATH_CENTER + col * TILE_SIZE;
+            const slotY = PATH_TOP_OFFSET + row * TILE_SIZE + TILE_SIZE / 2;
+            setEntityPosition(slotEl, slotX, slotY);
+            field.appendChild(slotEl);
+            const slot = { row, col, x: slotX, y: slotY, element: slotEl, towerId: null };
+            towerSlots.push(slot);
+            slotEl.addEventListener("click", () => handleSlotClick(slot));
+          });
+        });
+        function showDefaultBuildHint() {
+          buildInfo.textContent = "Select a tower type to see its traits.";
+        }
+
+        function showTowerHint(type) {
+          const c = towerCatalog[type];
+          if (!c) return;
+          buildInfo.innerHTML = `<strong>${c.name}</strong><br>${c.description}<br>Damage ${c.damage}, Range ${c.range}, Rate ${(1 / c.fireRate).toFixed(2)} shots/sec.`;
+        }
+
+        function showSoldierHint(type) {
+          const s = soldierCatalog[type];
+          if (!s) return;
+          const role = s.role ? s.role.charAt(0).toUpperCase() + s.role.slice(1) : (s.isMelee ? "Melee" : "Ranged");
+          const dps = s.damage && s.attackRate ? Math.round((s.damage / s.attackRate) * 10) / 10 : 0;
+          buildInfo.innerHTML = `<strong>${s.name}</strong><br>${role} unit. Health ${s.health}, Speed ${s.speed}.` + (s.damage ? ` Damage ${s.damage}, Range ${s.attackRange}, Rate ${(1 / s.attackRate).toFixed(2)} atk/sec (˜${dps}/s).` : "");
+        }
+
+        function initIconButtons() {
+          // Towers
+          buildButtons.forEach((button) => {
+            const type = button.dataset.build;
+            const c = towerCatalog[type];
+            if (!c) return;
+            button.innerHTML = `<span>${c.emoji}</span><span class=\"price-tag\">${c.cost}</span>`;
+            button.addEventListener("mouseenter", () => showTowerHint(type));
+            button.addEventListener("mouseleave", () => {
+              if (pendingBuildType) {
+                showTowerHint(pendingBuildType);
+              } else {
+                showDefaultBuildHint();
+              }
+            });
+          });
+          // Soldiers
+          soldierButtons.forEach((button) => {
+            const type = button.dataset.soldier;
+            const s = soldierCatalog[type];
+            if (!s) return;
+            button.innerHTML = `<span>${s.emoji}</span><span class=\"price-tag\">${s.cost}</span>`;
+            button.addEventListener("mouseenter", () => showSoldierHint(type));
+            button.addEventListener("mouseleave", () => {
+              if (pendingBuildType) {
+                showTowerHint(pendingBuildType);
+              } else {
+                showDefaultBuildHint();
+              }
+            });
+          });
+        }
+
+        buildButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            const type = button.dataset.build;
+            if (!type) {
+              return;
+            }
+            setBuildSelection(pendingBuildType === type ? null : type);
+          });
+        });
+
+        soldierButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            const type = button.dataset.soldier;
+            if (type) {
+              recruitSoldier(type);
+            }
+          });
+        });
+
+        nextWaveButton.addEventListener("click", () => {
+          startWave();
+        });
+
+        // Auto next wave toggle
+        function updateWaveToggles() {
+          if (autoToggleBtn) {
+            autoToggleBtn.classList.toggle('active', !!state.autoNextWave);
+            autoToggleBtn.setAttribute('aria-pressed', state.autoNextWave ? 'true' : 'false');
+          }
+          if (speedToggleBtn) {
+            speedToggleBtn.classList.toggle('active', !!state.doubleSpeed);
+            speedToggleBtn.setAttribute('aria-pressed', state.doubleSpeed ? 'true' : 'false');
+          }
+        }
+        if (autoToggleBtn) {
+          autoToggleBtn.addEventListener('click', () => {
+            state.autoNextWave = !state.autoNextWave;
+            addLog(state.autoNextWave ? "Auto waves enabled." : "Auto waves disabled.");
+            updateWaveToggles();
+            if (!waveActive && !gameOver) {
+              nextWaveButton.disabled = false;
+              nextWaveButton.textContent = "Start";
+            }
+          });
+        }
+        if (speedToggleBtn) {
+          speedToggleBtn.addEventListener('click', () => {
+            state.doubleSpeed = !state.doubleSpeed;
+            addLog(state.doubleSpeed ? "Double speed enabled." : "Double speed disabled.");
+            updateWaveToggles();
+          });
+        }
+        updateWaveToggles();
+
+        function setTacticsMode(mode) {
+          tactics.mode = mode;
+          tactics.retreatActive = mode === 'retreat';
+          if (mode !== 'retreat') {
+            tactics.partialRetreat = false;
+            for (const s of soldiers) {
+              if (s && !s.removed) {
+                s.tacticRetreat = false;
+                s.tacticRetreatComplete = false;
+              }
+            }
+          }
+          updateTacticButtons();
+        }
+
+        forwardButton.addEventListener("click", () => {
+          setTacticsMode('forward');
+          addLog("Tactics: Forward. Advancing towards enemies.");
+        });
+        middleButton.addEventListener("click", () => {
+          setTacticsMode('middle');
+          addLog("Tactics: Middle. Holding near the line.");
+        });
+
+        function hasHealthyFrontGuardians() {
+          for (const s of soldiers) {
+            if (!s || s.removed) continue;
+            if (s.stats?.isMelee) {
+              const hp = s.health / s.maxHealth;
+              const healthy = hp >= 0.65;
+              const atFront = s.y <= CONVERGE_Y + 10;
+              if (healthy && atFront) return true;
+            }
+          }
+          return false;
+        }
+        function isWounded(s) {
+          const thr = (s.stats?.lowHealthThreshold ?? 0.35);
+          const hp = s.health / s.maxHealth;
+          return hp <= Math.max(thr, 0.5);
+        }
+
+        function isRetreatBlocked() {
+          if (!enemies.length) return false;
+          const bottomY = typeof getBottommostTowerY === 'function' ? getBottommostTowerY() : (BASE_Y - 54);
+          for (const e of enemies) {
+            if (!e || e.removed) continue;
+            if (e.y >= bottomY - 1) return true;
+          }
+          return false;
+        }
+
+        retreatUIButton.addEventListener("click", () => {
+          if (isRetreatBlocked()) {
+            setTacticsMode('middle');
+            addLog("Base threatened: retreat disabled. Defend the base!");
+            return;
+          }
+          const guardiansHealthy = hasHealthyFrontGuardians();
+          tactics.partialRetreat = guardiansHealthy;
+          setTacticsMode('retreat');
+          addLog(guardiansHealthy ? "Tactics: Partial retreat. Wounded fall back." : "Tactics: Retreat! Troops falling back to base.");
+          for (const s of soldiers) {
+            if (s && !s.removed) {
+              const retreatThis = guardiansHealthy ? isWounded(s) : true;
+              s.tacticRetreat = retreatThis;
+              s.tacticRetreatComplete = false;
+            }
+          }
+        });
+
+        // Console commands
+        function runConsole(cmd) {
+          const text = (cmd || '').trim().toLowerCase();
+          if (!text) return;
+          if (text === 'show me the money') {
+            state.coins += 50000;
+            state.cheatUsed = true;
+            addLog("Cheat activated: +50000 coins.");
+            updateHud();
+          } else {
+            addLog(`Unknown command: ${cmd}`);
+          }
+        }
+        runConsoleButton.addEventListener('click', () => runConsole(consoleInput.value));
+        consoleInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            runConsole(consoleInput.value);
+            consoleInput.value = '';
+          }
+        });
+
+        upgradeButton.addEventListener("click", () => {
+          if (!selectedTowerId) {
+            return;
+          }
+          const tower = towers.find((t) => t.id === selectedTowerId);
+          if (tower) {
+            upgradeTower(tower);
+          }
+        });
+
+        // Hotkey: U to upgrade selected tower
+        document.addEventListener('keydown', (e) => {
+          const key = e.key || '';
+          if (key === 'u' || key === 'U') {
+            const ae = document.activeElement;
+            const isTyping = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable);
+            if (isTyping) return;
+            if (!selectedTowerId) return;
+            const tower = towers.find((t) => t.id === selectedTowerId);
+            if (tower) {
+              e.preventDefault();
+              upgradeTower(tower);
+            }
+          }
+        });
+
+        sellButton.addEventListener("click", () => {
+          if (!selectedTowerId) {
+            return;
+          }
+          const tower = towers.find((t) => t.id === selectedTowerId);
+          if (tower) {
+            sellTower(tower);
+          }
+        });
+
+        restartButton.addEventListener("click", () => {
+          window.location.reload();
+        });
+
+        // Difficulty selection handlers
+        (function initDifficultySelection() {
+          if (!difficultyOverlay) return;
+          const btns = Array.from(difficultyOverlay.querySelectorAll('button[data-difficulty]'));
+          const pick = (level) => {
+            const map = { easy: 1, normal: 0.5, hard: 0.25 };
+            const firstPick = !state.difficulty;
+            state.difficulty = level;
+            state.playerDamageMultiplier = map[level] ?? 1;
+            difficultyOverlay.classList.add('hidden');
+            addLog(`Difficulty set to ${level.charAt(0).toUpperCase() + level.slice(1)} (${Math.round(state.playerDamageMultiplier * 100)}% damage).`);
+            if (firstPick && level === 'hard') {
+              state.coins += 100;
+              addLog("Hard mode bonus: +100 coins at start.");
+              updateHud();
+            }
+            updateHud();
+          };
+          btns.forEach(b => b.addEventListener('click', () => pick(b.dataset.difficulty)));
+        })();
+
+        field.addEventListener("click", (event) => {
+          if (event.target === field || event.target.classList.contains("path")) {
+            selectTower(null);
+          }
+        });
+        seedInitialTowers();
+        initIconButtons();
+        setTacticsMode('middle');
+        updateHud();
+        addLog("Defense grid calibrated. Build, upgrade, sell, and start the first wave when ready.");
+        addLog("Troops gain veterancy from combat while healers restore and debilitate enemies.");
+
+        let lastTime = performance.now();
+        function loop(time) {
+          let dt = Math.min((time - lastTime) / 1000, 0.05);
+          lastTime = time;
+          if (state.doubleSpeed) dt *= 2;
+
+          if (!gameOver) {
+            updateTactics(dt);
+            updateSpawner(dt);
+            updateTowers(dt);
+            updateSoldiers(dt);
+            updateEnemies(dt);
+            updateProjectiles(dt);
+            if (waveActive) {
+              state.elapsedTime += dt;
+              hudTimeAccum += dt;
+              if (hudTimeAccum >= 0.5) { updateHud(); hudTimeAccum = 0; }
+            }
+          }
+
+          requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+        // Add timer tile and sync base icon in stats panel
+        (function setupStatsPanel() {
+          if (!statsContainer) return;
+          // Ensure timer tile exists
+          if (!document.getElementById('timer')) {
+            const timerTile = document.createElement('div');
+            timerTile.className = 'stat-line';
+            timerTile.setAttribute('title', 'Elapsed time during active waves');
+            timerTile.innerHTML = '<span class="label"><span class="icon">⏱️</span></span><span id="timer">00:00</span>';
+            statsContainer.appendChild(timerTile);
+          }
+          // Match base icon
+          const baseIconFromField = document.querySelector('#base span[aria-hidden="true"]');
+          const baseStatValue = document.getElementById('baseHP');
+          if (baseIconFromField && baseStatValue) {
+            const baseLabel = baseStatValue.previousElementSibling;
+            if (baseLabel) {
+              const iconSpan = baseLabel.querySelector('.icon');
+              if (iconSpan) iconSpan.textContent = baseIconFromField.textContent || iconSpan.textContent;
+            }
+          }
+        })();
+
+        // Add hover hints to stats tiles
+        (function setupStatHints() {
+          const setHint = (valueElId, hint) => {
+            const el = document.getElementById(valueElId);
+            if (!el) return;
+            const tile = el.parentElement;
+            if (tile && !tile.getAttribute('title')) tile.setAttribute('title', hint);
+          };
+          setHint('coins', 'Coins');
+          setHint('wave', 'Current wave');
+          setHint('baseHP', 'Base health');
+          setHint('enemyCount', 'Enemies on field');
+          setHint('troopCount', 'Allied troops');
+          setHint('killCount', 'Total kills');
+          const timerEl = document.getElementById('timer');
+          if (timerEl && timerEl.parentElement) timerEl.parentElement.setAttribute('title', 'Elapsed time during active waves');
+        })();
+        function findSlot(row, col) {
+          return towerSlots.find((slot) => slot.row === row && slot.col === col);
+        }
+
+        function seedInitialTowers() {
+          const starterArrow = findSlot(6, 2);
+          const starterCannon = findSlot(10, 5);
+          if (starterArrow) {
+            buildTower(starterArrow, "arrow", { free: true, silent: true, autoSelect: false });
+          }
+          if (starterCannon) {
+            buildTower(starterCannon, "cannon", { free: true, silent: true, autoSelect: false });
+          }
+          selectTower(null);
+        }
+
+        function handleSlotClick(slot) {
+          if (!slot) {
+            return;
+          }
+          if (slot.towerId) {
+            const tower = towers.find((t) => t.id === slot.towerId);
+            if (tower) {
+              selectTower(tower);
+            }
+            return;
+          }
+          if (!pendingBuildType) {
+            addLog("Select a tower type from the build panel first.");
+            return;
+          }
+          buildTower(slot, pendingBuildType);
+        }
+
+        function buildTower(slot, type, options = {}) {
+          const catalog = towerCatalog[type];
+          if (!catalog) {
+            return;
+          }
+          if (slot.towerId) {
+            addLog("That grid tile already holds a tower.");
+            return;
+          }
+          const cost = options.free ? 0 : catalog.cost;
+          if (!options.free && state.coins < cost) {
+            addLog("Not enough coins to construct that tower.");
+            return;
+          }
+          if (!options.free) {
+            state.coins -= cost;
+          }
+
+          idCounter += 1;
+          const tower = {
+            id: `tower-${idCounter}`,
+            type,
+            stats: catalog,
+            level: 1,
+            maxLevel: 4,
+            damage: catalog.damage,
+            range: catalog.range,
+            fireRate: catalog.fireRate,
+            cooldown: 0,
+            invested: catalog.cost,
+            x: slot.x,
+            y: slot.y,
+          };
+          if (options.free) {
+            tower.invested = catalog.cost * 0.75;
+          }
+
+          const el = document.createElement("div");
+          el.className = "tower entity";
+          el.innerHTML = `<span>${catalog.emoji}</span><div class="level">Lv1</div>`;
+          el.addEventListener("click", (event) => {
+            event.stopPropagation();
+            selectTower(tower);
+          });
+          setEntityPosition(el, tower.x, tower.y);
+          field.appendChild(el);
+          tower.element = el;
+
+          towers.push(tower);
+          slot.towerId = tower.id;
+          slot.element.style.visibility = "hidden";
+          slot.element.style.pointerEvents = "none";
+
+          if (!options.silent) {
+            addLog(`${catalog.name} established${cost ? ` (-${cost} coins)` : ""}.`);
+          }
+          if (!options.free) {
+            updateHud();
+          }
+          if (options.autoSelect !== false) {
+            selectTower(tower);
+          }
+          setBuildSelection(null);
+        }
+
+        function sellTower(tower) {
+          const slot = towerSlots.find((s) => s.towerId === tower.id);
+          if (slot) {
+            slot.towerId = null;
+            slot.element.style.visibility = "visible";
+            slot.element.style.pointerEvents = "auto";
+          }
+          if (tower.element && tower.element.parentNode) {
+            tower.element.parentNode.removeChild(tower.element);
+          }
+          const index = towers.indexOf(tower);
+          if (index !== -1) {
+            towers.splice(index, 1);
+          }
+          const refund = getSellValue(tower);
+          state.coins += refund;
+          addLog(`${tower.stats.name} dismantled (+${refund} coins).`);
+          selectTower(null);
+          updateHud();
+        }
+
+        function getSellValue(tower) {
+          return Math.max(20, Math.round(tower.invested * SELL_REFUND_RATE));
+        }
+        function createSoldierStats(template) {
+          const stats = { ...template };
+          if (template.projectile) {
+            stats.projectile = { ...template.projectile };
+          }
+          return stats;
+        }
+        function registerSoldierKill(soldier, enemy) {
+          if (!soldier || soldier.removed) {
+            return;
+          }
+          soldier.killCount = (soldier.killCount || 0) + 1;
+          checkSoldierLevelProgress(soldier);
+        }
+
+        function registerSoldierHealing(soldier, amount) {
+          if (!soldier || soldier.removed || !amount) {
+            return;
+          }
+          soldier.healAccumulated = (soldier.healAccumulated || 0) + amount;
+          checkSoldierLevelProgress(soldier);
+        }
+
+        function checkSoldierLevelProgress(soldier) {
+          if (!soldier || soldier.removed) {
+            return;
+          }
+          const thresholds = soldier.stats.levelThresholds || [];
+          if (!thresholds.length) {
+            return;
+          }
+          const metric = soldier.stats.role === "healer" ? soldier.healAccumulated || 0 : soldier.killCount || 0;
+          while (soldier.level < soldier.maxLevel) {
+            const requirement = thresholds[soldier.level - 1];
+            if (typeof requirement !== "number" || metric < requirement) {
+              break;
+            }
+            soldier.level += 1;
+            applySoldierLevelUp(soldier);
+            updateSoldierLevelBadge(soldier);
+            addLog(`${soldier.stats.name} promoted to Lv${soldier.level}!`);
+          }
+        }
+
+        function applySoldierLevelUp(soldier) {
+          const bonuses = soldier.stats.levelBonuses || {};
+          if (bonuses.health) {
+            const newMax = Math.round(soldier.maxHealth * (1 + bonuses.health));
+            const delta = newMax - soldier.maxHealth;
+            soldier.maxHealth = newMax;
+            soldier.health = Math.min(soldier.maxHealth, soldier.health + Math.max(6, Math.round(delta * 0.5)));
+          }
+          if (bonuses.damage && soldier.stats.damage) {
+            soldier.stats.damage = Math.round(soldier.stats.damage * (1 + bonuses.damage));
+          }
+          if (bonuses.attackRate && soldier.stats.attackRate) {
+            soldier.stats.attackRate = Math.max(0.3, soldier.stats.attackRate * (1 - bonuses.attackRate));
+          }
+          if (bonuses.attackRange && soldier.stats.attackRange) {
+            soldier.stats.attackRange += bonuses.attackRange;
+          }
+          if (bonuses.healAmount && soldier.stats.healAmount) {
+            soldier.stats.healAmount = Math.round(soldier.stats.healAmount * (1 + bonuses.healAmount));
+          }
+          if (bonuses.manaMax && soldier.stats.manaMax) {
+            soldier.stats.manaMax = Math.round(soldier.stats.manaMax * (1 + bonuses.manaMax));
+            soldier.manaMax = soldier.stats.manaMax;
+            soldier.mana = Math.min(soldier.stats.manaMax, (soldier.mana || 0) + Math.round(soldier.stats.manaMax * 0.25));
+          }
+          if (bonuses.slowDuration && soldier.stats.slowDuration) {
+            soldier.stats.slowDuration = soldier.stats.slowDuration * (1 + bonuses.slowDuration);
+          }
+          updateSoldierHealthBar(soldier);
+        }
+
+        function updateSoldierLevelBadge(soldier) {
+          if (!soldier || soldier.removed || !soldier.levelEl) {
+            return;
+          }
+          soldier.levelEl.textContent = `Lv${soldier.level}`;
+          if (soldier.dashboardLevel) soldier.dashboardLevel.textContent = String(soldier.level);
+        }
+
+        function recruitSoldier(type) {
+          const template = soldierCatalog[type];
+          if (!template) {
+            return;
+          }
+          if (state.coins < template.cost) {
+            addLog("Not enough coins for that reinforcement.");
+            return;
+          }
+          const stats = createSoldierStats(template);
+          state.coins -= template.cost;
+          idCounter += 1;
+          const soldier = {
+            id: `soldier-${idCounter}`,
+            serial: idCounter,
+            type,
+            template,
+            stats,
+            health: stats.health,
+            maxHealth: stats.health,
+            attackCooldown: 0,
+            healCooldown: 0,
+            x: PATH_CENTER,
+            y: BASE_Y - 80 + (Math.random() * 14 - 7),
+            lockTimer: 0,
+            removed: false,
+            level: 1,
+            progress: 0,
+            killCount: 0,
+            healAccumulated: 0,
+            maxLevel: Math.min((stats.levelThresholds?.length || 0) + 1, 4),
+            manaMax: stats.manaMax || 0,
+            mana: stats.manaMax || 0,
+            slowCooldownTimer: 0,
+            status: {},
+            noManaRetreatTimer: 0,
+            noManaRetreat: false,
+            oomLock: false,
+            castMoveSlowTimer: 0,
+          };
+          soldier.retreating = false;
+
+          const el = document.createElement("div");
+          el.className = "soldier entity";
+          el.innerHTML = `<span>${stats.emoji}</span><div class="level">Lv1 <span class="dots"><span class="hp-dot"></span>${(stats.manaMax ? '<span class=\"mp-dot\"></span>' : '')}</span></div><div class="health"><span style="width:100%"></span></div>${(stats.manaMax ? '<div class=\"mana\"><span style=\"width:100%\"></span></div>' : '')}`;
+          soldier.element = el;
+          soldier.levelEl = el.querySelector(".level");
+          soldier.healthBar = el.querySelector(".health span");
+          soldier.manaBar = el.querySelector(".mana span");
+          soldier.hpDot = el.querySelector('.hp-dot');
+          soldier.mpDot = el.querySelector('.mp-dot');
+          setEntityPosition(el, soldier.x, soldier.y);
+          field.appendChild(el);
+          soldiers.push(soldier);
+          updateSoldierLevelBadge(soldier);
+          updateSoldierHealthBar(soldier);
+          if (soldier.manaBar) { updateSoldierManaBar(soldier); }
+
+          addLog(`${stats.name} reporting for duty (-${template.cost} coins).`);
+          updateHud();
+          renderTroopPanel();
+        }
+        function updateSpawner(dt) {
+          if (!waveActive) {
+            return;
+          }
+          waveClock += dt;
+          while (spawnQueue.length && spawnQueue[0].time <= waveClock) {
+            const spawn = spawnQueue.shift();
+            if (spawn) {
+              createEnemy(spawn.kind);
+            }
+          }
+        }
+
+        function createEnemy(kind) {
+          const stats = enemyCatalog[kind];
+          if (!stats) {
+            return;
+          }
+          idCounter += 1;
+          const laneCol = Math.floor(Math.random() * GRID_COLS);
+          const laneX = PATH_LEFT + laneCol * TILE_SIZE + TILE_SIZE / 2;
+          const yOffset = Math.random() * 80 + 40;
+          const enemy = {
+            id: `enemy-${idCounter}`,
+            type: kind,
+            stats,
+            health: stats.health,
+            maxHealth: stats.health,
+            attackCooldown: 0,
+            x: laneX + (Math.random() * 12 - 6),
+            y: PATH_TOP_OFFSET - yOffset - 60,
+            spawnLaneX: laneX,
+            convergeTarget: PATH_CENTER + (Math.random() * 22 - 11),
+            joined: false,
+            lockTimer: 0,
+            stunTimer: 0,
+            statusBadge: null,
+            removed: false,
+            resistances: {},
+            resistanceTimers: {},
+            slowTimer: 0,
+            slowAmount: 0,
+          };
+          if (kind === "boss" || kind === "wraith") {
+            const scale = 1 + state.wave * 0.12;
+            enemy.health = Math.round(enemy.health * scale);
+            enemy.maxHealth = enemy.health;
+            enemy.dynamicReward = Math.round(stats.reward + state.wave * 22);
+            enemy.convergeTarget = PATH_CENTER;
+            // Assign a single random power for this boss (one per wave)
+            const powers = kind === 'wraith' ? ["boomerang", "sturdy"] : ["triple", "whirlwind", "sturdy", "speedy"];
+            enemy.bossPower = powers[Math.floor(Math.random() * powers.length)];
+            if (enemy.bossPower === "sturdy") {
+              enemy.damageReduction = 0.35; // reduce incoming damage by 35%
+              if (enemy.element) enemy.element.style.filter = "brightness(0.7) saturate(0.9)";
+              addLog("Boss empowers: Sturdy hide. Harder to damage this wave.");
+            } else if (enemy.bossPower === "speedy") {
+              enemy.speedBoost = 1.4; // move 40% faster
+              if (enemy.element) enemy.element.style.filter = "brightness(1.4) saturate(1.2)";
+              addLog("Boss empowers: Lightning speed. Faster advance this wave.");
+            } else if (enemy.bossPower === "boomerang") {
+              addLog("Boss empowers: Spirit boomerang.");
+            } else if (enemy.bossPower === "triple") {
+              addLog("Boss empowers: Triple shuriken barrage.");
+            } else if (enemy.bossPower === "whirlwind") {
+              addLog("Boss empowers: Whirlwind area attack.");
+            }
+          }
+          const el = document.createElement("div");
+          el.className = "enemy entity";
+          el.innerHTML = `<span>${stats.emoji}</span><div class="health"><span style="width:100%"></span></div>`;
+          enemy.element = el;
+          enemy.healthBar = el.querySelector(".health span");
+          setEntityPosition(el, enemy.x, enemy.y);
+          field.appendChild(el);
+          if (kind === "boss" || kind === "wraith") {
+            enemy.element.classList.add("boss");
+            if (kind === 'wraith') enemy.element.classList.add('wraith');
+            if (enemy.bossPower === "sturdy") {
+              enemy.element.style.filter = "brightness(0.7) saturate(0.9)";
+            } else if (enemy.bossPower === "speedy") {
+              enemy.element.style.filter = "brightness(1.4) saturate(1.2)";
+            }
+            enemy.healthBar.parentElement.style.width = "52px";
+            addLog(`${stats.name} bellows onto the field!`);
+          } else {
+            addLog(`${stats.name} joins the wave.`);
+          }
+          enemies.push(enemy);
+          updateHud();
+        }
+
+        function updateTowers(dt) {
+          if (!enemies.length) {
+            return;
+          }
+          for (const tower of towers) {
+            tower.cooldown = Math.max(0, tower.cooldown - dt);
+            const target = findEnemyForTower(tower);
+            if (!target) {
+              continue;
+            }
+            if (tower.cooldown <= 0) {
+              fireTowerProjectile(tower, target);
+              tower.cooldown = tower.fireRate;
+            }
+          }
+        }
+
+        function fireTowerProjectile(tower, target) {
+          const projectileStats = tower.stats.projectile;
+          const projectile = {
+            originType: "tower",
+            ownerId: tower.id,
+            towerType: tower.type,
+            x: tower.x,
+            y: tower.y - 12,
+            targetType: "enemy",
+            targetId: target.id,
+            speed: projectileStats.speed,
+            damage: tower.damage,
+            emoji: projectileStats.emoji,
+            hitEffect: projectileStats.hit || tower.stats.effect,
+          };
+          if (tower.type === "cannon") {
+            projectile.splash = 64 + tower.level * 10;
+          }
+          if (tower.type === "storm") {
+            projectile.status = { kind: "shock", duration: 0.75 + tower.level * 0.15 };
+          }
+          if (tower.type === "arrow" && tower.level >= 3) {
+            projectile.knockback = 22 + (tower.level - 2) * 6;
+          }
+          launchProjectile(projectile);
+        }
+
+        function launchProjectile(data) {
+          idCounter += 1;
+          const projectile = {
+            id: `proj-${idCounter}`,
+            ...data,
+            removed: false,
+          };
+          const el = document.createElement("div");
+          el.className = "projectile entity";
+          el.textContent = projectile.emoji;
+          if (projectile.tag === 'boomerang') {
+            el.classList.add('boomerang');
+          }
+          projectile.element = el;
+          setEntityPosition(el, projectile.x, projectile.y);
+          field.appendChild(el);
+          projectiles.push(projectile);
+        }
+        function updateSoldiers(dt) {
+          const baseThreatened = isBaseUnderThreat();
+          for (let i = soldiers.length - 1; i >= 0; i--) {
+            const soldier = soldiers[i];
+            if (!soldier || soldier.removed) {
+              continue;
+            }
+            // Sanitize invalid health to avoid immortal/NaN states
+            if (!Number.isFinite(soldier.health)) {
+              soldier.health = 0;
+            }
+            if (soldier.health <= 0) {
+              removeSoldier(soldier);
+              continue;
+            }
+            soldier.attackCooldown = Math.max(0, soldier.attackCooldown - dt);
+            soldier.lockTimer = Math.max(0, (soldier.lockTimer || 0) - dt);
+            if (typeof soldier.healCooldown === "number") {
+              soldier.healCooldown = Math.max(0, soldier.healCooldown - dt);
+            }
+            if (typeof soldier.slowCooldownTimer === "number") {
+              soldier.slowCooldownTimer = Math.max(0, soldier.slowCooldownTimer - dt);
+            }
+            if (soldier.stats.role === "healer") {
+              handleHealerBehavior(soldier, dt);
+              updateSoldierHealthBar(soldier);
+              continue;
+            }
+            if (soldier.lockTimer > 0) {
+              updateSoldierHealthBar(soldier);
+              continue;
+            }
+            handleCombatSoldier(soldier, dt, baseThreatened);
+            updateSoldierHealthBar(soldier);
+          }
+          resolveCrowding(soldiers, CROWD_MIN_DISTANCE, CROWD_SEPARATION_FORCE);
+          for (const soldier of soldiers) {
+            if (!soldier || soldier.removed) {
+              continue;
+            }
+            setEntityPosition(soldier.element, soldier.x, soldier.y);
+          }
+        }
+
+        function handleCombatSoldier(soldier, dt, baseThreatened) {
+          const stats = soldier.stats;
+          // Mana regeneration for units with mana (e.g., arcanists)
+          const manaMaxC = stats.manaMax || soldier.manaMax || 0;
+          if (manaMaxC && waveActive && stats.manaRegen) {
+            soldier.manaMax = manaMaxC;
+            const beforeMana = soldier.mana ?? manaMaxC;
+            soldier.mana = Math.min(manaMaxC, beforeMana + stats.manaRegen * dt);
+            if (soldier.manaBar && soldier.mana !== beforeMana) updateSoldierManaBar(soldier);
+          } else if (manaMaxC && soldier.mana === undefined) {
+            soldier.mana = manaMaxC;
+            if (soldier.manaBar) updateSoldierManaBar(soldier);
+          }
+          if (manaMaxC && soldier.oomLock && (soldier.type === 'ranged' ? ((soldier.mana||0)/manaMaxC >= 0.5) : ((soldier.mana||0)/manaMaxC >= 0.3))) {
+            soldier.oomLock = false;
+          }
+          const lowThreshold = stats.lowHealthThreshold ?? 0.32;
+          const isLow = soldier.health / soldier.maxHealth <= lowThreshold;
+          const guardian = !stats.isMelee ? findGuardianAnchor(soldier) : null;
+          const anchorPoint = guardian ? getGuardianBacklinePosition(soldier, guardian) : null;
+
+          if (((tactics.mode === 'retreat') && !tactics.partialRetreat) || soldier.tacticRetreat) {
+            const refuge = getRetreatPoint(soldier);
+            stepTowards(soldier, refuge.x, refuge.y, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 1.05, dt);
+            const distRef = distancePoints(soldier.x, soldier.y, refuge.x, refuge.y);
+            if (distRef < 6) {
+              soldier.tacticRetreatComplete = true;
+            }
+            // Healers may still heal nearby allies while retreating
+            const healNear = findWoundedAlly(soldier, Math.max(stats.healRange || 60, 60) + 120, 1);
+            if (false) { // removed: non-healers should not heal here
+              const missing = healNear.maxHealth - healNear.health;
+              if (missing > 0) {
+                const healAmount = Math.min(stats.healAmount, missing);
+                const mCost = stats.healCost || 0;
+                const mMax = soldier.manaMax || stats.manaMax || 0;
+                if (!mMax || (soldier.mana || 0) >= mCost) {
+                  if (mCost) {
+                    soldier.mana = Math.max(0, (soldier.mana || 0) - mCost);
+                    if (soldier.manaBar) updateSoldierManaBar(soldier);
+                    if ((soldier.mana || 0) <= 0 && mMax) soldier.oomLock = true;
+                  }
+                  const projectile = {
+                    originType: "healer",
+                    ownerId: soldier.id,
+                    x: soldier.x,
+                    y: soldier.y - 10,
+                    targetType: "soldier",
+                    targetId: healNear.id,
+                    speed: 360,
+                    emoji: "💚",
+                    hitEffect: "✨",
+                    healAmount: healAmount,
+                  };
+                  launchProjectile(projectile);
+                  { const mCost = stats.healCost || 0; const mMax = soldier.manaMax || stats.manaMax || 0; if (mCost) { soldier.mana = Math.max(0, (soldier.mana || 0) - mCost); if (soldier.manaBar) updateSoldierManaBar(soldier); if ((soldier.mana || 0) <= 0 && mMax) soldier.oomLock = true; } }
+                  soldier.healCooldown = stats.healCooldown || 1;
+                  soldier.castMoveSlowTimer = Math.max(soldier.castMoveSlowTimer || 0, 0.35);
+                }
+              }
+            }
+            return;
+          }
+
+          // Temporary retreat to recover mana if depleted (max 5s)
+          if ((manaMaxC || 0) > 0 && !baseThreatened) {
+            if ((soldier.mana || 0) <= 0) {
+              soldier.noManaRetreatTimer = Math.max(0, (soldier.noManaRetreatTimer || 0));
+              if ((soldier.noManaRetreatTimer || 0) <= 0) {
+                soldier.noManaRetreatTimer = 5;
+              }
+            }
+            if ((soldier.noManaRetreatTimer || 0) > 0) {
+              if ((soldier.mana || 0) > 0) {
+                soldier.noManaRetreatTimer = 0;
+              } else {
+                soldier.noManaRetreatTimer = Math.max(0, soldier.noManaRetreatTimer - dt);
+                const refuge = getRetreatPoint(soldier);
+                stepTowards(soldier, refuge.x, refuge.y, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 1.05, dt);
+                return;
+              }
+            }
+          }
+
+          if (!stats.isMelee && !waveActive) {
+            const standby = anchorPoint || getRestPosition(soldier);
+            // Clamp standby Y so ranged stays below bottom-most guardian
+            let aimY = standby.y;
+            const bottomGY = getBottommostGuardianY();
+            if (Number.isFinite(bottomGY)) {
+              aimY = Math.max(aimY, bottomGY + BACKLINE_MIN_FROM_BOTTOM_GUARDIAN);
+            }
+            if (distancePoints(soldier.x, soldier.y, standby.x, aimY) > 3) {
+              stepTowards(soldier, standby.x, aimY, stats.speed * 0.82, dt);
+            }
+            return;
+          }
+
+          if (baseThreatened) {
+            soldier.retreating = false;
+          } else if (isLow) {
+            soldier.retreating = true;
+          } else if (soldier.retreating && soldier.health / soldier.maxHealth >= 0.6) {
+            soldier.retreating = false;
+          }
+
+          if (soldier.retreating) {
+            const refuge = getRetreatPoint(soldier);
+            // Run faster towards the base while retreating
+            stepTowards(soldier, refuge.x, refuge.y, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 1.6, dt);
+            return;
+          }
+
+          // In retreat tactics, never advance above the lowest tower
+          if (tactics.mode === 'retreat' && towers.length) {
+            const retreatLimit = getBottommostTowerY();
+            if (soldier.y < retreatLimit - 1) {
+              stepTowards(soldier, soldier.x, retreatLimit, stats.speed, dt);
+              return;
+            }
+          }
+
+          if (anchorPoint && soldier.y < anchorPoint.y - 6) {
+            const bottomGY = getBottommostGuardianY();
+            const safeY = Number.isFinite(bottomGY) ? Math.max(anchorPoint.y, bottomGY + BACKLINE_MIN_FROM_BOTTOM_GUARDIAN) : anchorPoint.y;
+            stepTowards(soldier, anchorPoint.x, safeY, stats.speed, dt);
+            return;
+          }
+
+          const target = findClosestEnemy(soldier);
+          if (target) {
+            const dist = distancePoints(soldier.x, soldier.y, target.x, target.y);
+            const attackRate = baseThreatened ? stats.attackRate * (stats.frenzyMultiplier || 0.75) : stats.attackRate;
+            if (stats.isMelee) {
+              if (dist > stats.attackRange) {
+                if (tactics.mode === 'forward') {
+                  stepTowards(soldier, target.x, target.y, stats.speed, dt);
+                } else if (tactics.mode === 'retreat' && towers.length) {
+                  const retreatLimit = getBottommostTowerY();
+                  const aimY = Math.max(retreatLimit, target.y);
+                  stepTowards(soldier, target.x, aimY, stats.speed, dt);
+                } else {
+                  const chargeLimitY = getAdvanceLimitY(1);
+                  const aimY = Math.max(chargeLimitY, target.y);
+                  stepTowards(soldier, target.x, aimY, stats.speed, dt);
+                }
+              } else if (soldier.attackCooldown <= 0) {
+                spawnEffect(target.x, target.y, stats.effect);
+                const killed = applyDamageToEnemy(target, stats.damage, { kind: "soldier", soldier });
+                if (!killed) {
+                  // Small knockback and impact cue for melee hits
+                  applyKnockback(target, 12);
+                  spawnEffect(target.x, target.y - 6, "💥");
+                }
+                soldier.attackCooldown = attackRate;
+                soldier.lockTimer = Math.max(soldier.lockTimer || 0, stats.attackHold || 0.3);
+              }
+            } else {
+              const comfortRatio = stats.comfortRatio || 0.65;
+              const preferred = stats.attackRange * comfortRatio;
+              if (dist < preferred * 0.9) {
+                const awayX = soldier.x - (target.x - soldier.x);
+                const awayY = soldier.y - (target.y - soldier.y);
+                stepTowards(soldier, awayX, awayY, stats.speed * 0.9, dt);
+              } else if (dist > stats.attackRange * 0.95 && (!anchorPoint || target.y > guardian.y + 12)) {
+                if (tactics.mode === 'forward') {
+                  // While advancing, don't cross above the bottom-most guardian buffer
+                  const bottomGY = getBottommostGuardianY();
+                  const limitY = Number.isFinite(bottomGY) ? Math.max(target.y, bottomGY + BACKLINE_MIN_FROM_BOTTOM_GUARDIAN) : target.y;
+                  stepTowards(soldier, target.x, limitY, stats.speed, dt);
+                } else if (tactics.mode === 'retreat' && towers.length) {
+                  const retreatLimit = getBottommostTowerY();
+                  const aimY = Math.max(retreatLimit, target.y);
+                  stepTowards(soldier, target.x, aimY, stats.speed, dt);
+                } else {
+                  const chargeLimitY = getAdvanceLimitY(1);
+                  let aimY = Math.max(chargeLimitY, target.y);
+                  const bottomGY = getBottommostGuardianY();
+                  if (Number.isFinite(bottomGY)) {
+                    aimY = Math.max(aimY, bottomGY + BACKLINE_MIN_FROM_BOTTOM_GUARDIAN);
+                  }
+                  stepTowards(soldier, target.x, aimY, stats.speed, dt);
+                }
+              } else {
+                if (soldier.attackCooldown <= 0) {
+                  const atkCost = soldier.stats.attackManaCost || 0;
+                  const mMax = soldier.manaMax || soldier.stats.manaMax || 0;
+                  const cur = soldier.mana || 0;
+                  if (soldier.oomLock || (atkCost > 0 && mMax && cur < atkCost)) {
+                    if (atkCost > 0 && mMax && cur < atkCost) soldier.oomLock = true;
+                  } else {
+                    fireSoldierProjectile(soldier, target);
+                    soldier.attackCooldown = attackRate;
+                  }
+                }
+                if (anchorPoint) {
+                  const bottomGY = getBottommostGuardianY();
+                  const safeY = Number.isFinite(bottomGY) ? Math.max(anchorPoint.y, bottomGY + BACKLINE_MIN_FROM_BOTTOM_GUARDIAN) : anchorPoint.y;
+                  const anchorDist = distancePoints(soldier.x, soldier.y, anchorPoint.x, safeY);
+                  if (anchorDist > 18) {
+                    stepTowards(soldier, anchorPoint.x, safeY, stats.speed * 0.6, dt);
+                  }
+                }
+              }
+            }
+          } else {
+            if (waveActive && enemies.length > 0) {
+              if (tactics.mode === 'forward') {
+                const pursue = findClosestEnemy(soldier);
+                if (pursue) {
+                  stepTowards(soldier, pursue.x, pursue.y, stats.speed * 0.9, dt);
+                  return;
+                }
+              } else if (tactics.mode === 'retreat' && towers.length) {
+                const retreatLimit = getBottommostTowerY();
+                if (soldier.y < retreatLimit - 1) {
+                  stepTowards(soldier, soldier.x, retreatLimit, stats.speed * 0.9, dt);
+                  return;
+                }
+              } else {
+                const limitY = getAdvanceLimitY(1);
+                if (soldier.y > limitY + 1) {
+                  stepTowards(soldier, soldier.x, limitY, stats.speed * 0.9, dt);
+                  return;
+                }
+              }
+            }
+            const rest = anchorPoint || getRestPosition(soldier);
+            const distHome = distancePoints(soldier.x, soldier.y, rest.x, rest.y);
+            if (distHome > 2) {
+              stepTowards(soldier, rest.x, rest.y, stats.speed * 0.8, dt);
+            }
+          }
+        }
+
+        function handleHealerBehavior(soldier, dt) {
+          const stats = soldier.stats;
+          const manaMax = stats.manaMax || soldier.manaMax || 0;
+          if (manaMax && waveActive && stats.manaRegen) {
+            soldier.manaMax = manaMax;
+            const before = soldier.mana ?? manaMax;
+            soldier.mana = Math.min(manaMax, before + stats.manaRegen * dt);
+            if (soldier.manaBar && soldier.mana !== before) updateSoldierManaBar(soldier); if (soldier.oomLock && manaMax && (soldier.mana / manaMax) >= 0.3) soldier.oomLock = false;
+          } else if (manaMax && soldier.mana === undefined) {
+            soldier.mana = manaMax;
+            if (soldier.manaBar) updateSoldierManaBar(soldier);
+          }
+
+          if (soldier.lockTimer > 0) { /* healer can move while casting */ }
+
+          const guardian = findGuardianAnchor(soldier);
+          const anchorPoint = guardian ? getGuardianBacklinePosition(soldier, guardian) : null;
+
+          if (((tactics.mode === 'retreat') && !tactics.partialRetreat) || soldier.tacticRetreat) {
+            const refuge = getRetreatPoint(soldier);
+            stepTowards(soldier, refuge.x, refuge.y, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 1.05, dt);
+            const distRef = distancePoints(soldier.x, soldier.y, refuge.x, refuge.y);
+            if (distRef < 6) {
+              soldier.tacticRetreatComplete = true;
+            }
+            return;
+          }
+
+          // Temporary retreat to recover mana if depleted (max 5s)
+          // Healers can still operate with 0 mana (healing doesn't require mana)
+          if (stats.role !== 'healer') {
+            if ((manaMax || 0) > 0 && (soldier.mana || 0) <= 0) {
+              if ((soldier.noManaRetreatTimer || 0) <= 0) {
+                soldier.noManaRetreatTimer = 5;
+              }
+            }
+            if ((soldier.noManaRetreatTimer || 0) > 0) {
+              if ((soldier.mana || 0) > 0) {
+                soldier.noManaRetreatTimer = 0;
+              } else {
+                soldier.noManaRetreatTimer = Math.max(0, soldier.noManaRetreatTimer - dt);
+                const refuge = getRetreatPoint(soldier);
+                stepTowards(soldier, refuge.x, refuge.y, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 1.05, dt);
+                return;
+              }
+            }
+          }
+
+          if (!waveActive) {
+            const standby = anchorPoint || getRestPosition(soldier);
+            let aimY = standby.y;
+            {
+              const bottomGY = getBottommostGuardianY();
+              if (Number.isFinite(bottomGY)) aimY = Math.max(aimY, bottomGY + BACKLINE_MIN_FROM_BOTTOM_GUARDIAN);
+            }
+            if (distancePoints(soldier.x, soldier.y, standby.x, aimY) > 3) {
+              stepTowards(soldier, standby.x, aimY, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 0.8, dt);
+            }
+            soldier.retreating = false;
+            return;
+          }
+
+          const threatRadius = stats.threatRadius || 120;
+          const threat = findClosestEnemy(soldier, threatRadius);
+          const guardiansHealthy = hasHealthyFrontGuardians();
+          // Only perform threat-based retreat if no healthy frontline guardians are holding
+          if (threat && !guardiansHealthy) {
+            soldier.retreating = true;
+            const dx = soldier.x - threat.x;
+            const dy = soldier.y - threat.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            const retreatDistance = stats.retreatBuffer || 180;
+            const targetX = soldier.x + (dx / dist) * retreatDistance;
+            const targetY = soldier.y + (dy / dist) * retreatDistance;
+            stepTowards(soldier, targetX, targetY, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 1.05, dt);
+            // Try to heal while falling back if near an ally
+            const healNear = findWoundedAlly(soldier, Math.max(stats.healRange || 60, 60) + 100, 1);
+            if (healNear && soldier.healCooldown <= 0) { // healer can heal regardless of oomLock
+              const missing = healNear.maxHealth - healNear.health;
+              if (missing > 0) {
+                const healAmount = Math.min(stats.healAmount, missing);
+                const mCost = stats.healCost || 0;
+                const mMax = soldier.manaMax || stats.manaMax || 0;
+                if (!mMax || (soldier.mana || 0) >= mCost) {
+                  if (mCost) {
+                    soldier.mana = Math.max(0, (soldier.mana || 0) - mCost);
+                    if (soldier.manaBar) updateSoldierManaBar(soldier);
+                    if ((soldier.mana || 0) <= 0 && mMax) soldier.oomLock = true;
+                  }
+                  const projectile = {
+                    originType: "healer",
+                    ownerId: soldier.id,
+                    x: soldier.x,
+                    y: soldier.y - 10,
+                    targetType: "soldier",
+                    targetId: healNear.id,
+                    speed: 360,
+                    emoji: "💚",
+                    hitEffect: "✨",
+                    healAmount: healAmount,
+                  };
+                  launchProjectile(projectile);
+                  soldier.healCooldown = stats.healCooldown || 1;
+                  soldier.castMoveSlowTimer = Math.max(soldier.castMoveSlowTimer || 0, 0.35);
+                }
+              }
+            }
+            return;
+          }
+
+          if (soldier.retreating) {
+            const rest = anchorPoint || getRestPosition(soldier);
+            let safeY = rest.y;
+            {
+              const bottomGY = getBottommostGuardianY();
+              if (Number.isFinite(bottomGY)) safeY = Math.max(safeY, bottomGY + BACKLINE_MIN_FROM_BOTTOM_GUARDIAN);
+            }
+            if (distancePoints(soldier.x, soldier.y, rest.x, safeY) > 5) {
+              stepTowards(soldier, rest.x, safeY, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 0.85, dt);
+              return;
+            }
+            soldier.retreating = false;
+          }
+
+          const healRadius = stats.retreatBuffer || 220;
+          const threshold = stats.healThreshold ?? 0.75;
+          const ally = findWoundedAlly(soldier, healRadius, threshold);
+
+          if (!ally && anchorPoint && soldier.y < anchorPoint.y - 6) {
+            let safeY = anchorPoint.y;
+            {
+              const bottomGY = getBottommostGuardianY();
+              if (Number.isFinite(bottomGY)) safeY = Math.max(safeY, bottomGY + BACKLINE_MIN_FROM_BOTTOM_GUARDIAN);
+            }
+            stepTowards(soldier, anchorPoint.x, safeY, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 0.9, dt);
+            return;
+          }
+
+          if (ally) {
+            const dist = distancePoints(soldier.x, soldier.y, ally.x, ally.y);
+            const desired = (stats.healRange || 60);
+            const targetY = guardian ? Math.max(ally.y + 6, guardian.y + 12) : ally.y;
+            const targetX = anchorPoint ? clamp(ally.x, PATH_LEFT - 80, PATH_RIGHT + 80) : ally.x;
+            if (dist > desired * 0.9 || Math.abs(soldier.y - targetY) > 6) {
+              let aimY = targetY;
+              {
+                const bottomGY = getBottommostGuardianY();
+                if (Number.isFinite(bottomGY)) aimY = Math.max(aimY, bottomGY + BACKLINE_MIN_FROM_BOTTOM_GUARDIAN);
+              }
+              stepTowards(soldier, targetX, aimY, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1), dt);
+              return;
+            }
+            if (soldier.healCooldown <= 0) { // healer can heal regardless of oomLock
+              const missing = ally.maxHealth - ally.health;
+              if (missing > 0) {
+                const healAmount = Math.min(stats.healAmount, missing);
+                const projectile = {
+                  originType: "healer",
+                  ownerId: soldier.id,
+                  x: soldier.x,
+                  y: soldier.y - 10,
+                  targetType: "soldier",
+                  targetId: ally.id,
+                  speed: 360,
+                  emoji: "💚",
+                  hitEffect: "✨",
+                  healAmount: healAmount,
+                };
+                launchProjectile(projectile);
+                { const mCost = stats.healCost || 0; const mMax = soldier.manaMax || stats.manaMax || 0; if (mCost) { soldier.mana = Math.max(0, (soldier.mana || 0) - mCost); if (soldier.manaBar) updateSoldierManaBar(soldier); if ((soldier.mana || 0) <= 0 && mMax) soldier.oomLock = true; } }
+                soldier.healCooldown = stats.healCooldown || 1;
+                soldier.castMoveSlowTimer = Math.max(soldier.castMoveSlowTimer || 0, 0.35);
+              }
+            } else {
+              const t = performance.now() / 240;
+              const orbitX = targetX + Math.cos(t) * 8;
+              const orbitY = targetY + Math.sin(t) * 4;
+              stepTowards(soldier, orbitX, orbitY, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 0.55, dt);
+            }
+            return;
+          }
+
+          const rest = anchorPoint || getRestPosition(soldier);
+          if (waveActive && enemies.length > 0) {
+            if (tactics.mode === 'forward') {
+              const pursue = findClosestEnemy(soldier);
+              if (pursue) {
+                stepTowards(soldier, pursue.x, pursue.y, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 0.75, dt);
+                return;
+              }
+            } else if (tactics.mode === 'retreat' && towers.length) {
+              const retreatLimit = getBottommostTowerY();
+              if (soldier.y < retreatLimit - 1) {
+                stepTowards(soldier, soldier.x, retreatLimit, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 0.75, dt);
+                return;
+              }
+            }
+          }
+          if (distancePoints(soldier.x, soldier.y, rest.x, rest.y) > 6) {
+            stepTowards(soldier, rest.x, rest.y, stats.speed * (soldier.castMoveSlowTimer > 0 ? 0.3 : 1) * 0.7, dt);
+          }
+
+          if (stats.slowRange && stats.slowAmount && stats.slowDuration) {
+            const slowTarget = findClosestEnemy(soldier, stats.slowRange);
+            if (slowTarget &&
+              soldier.slowCooldownTimer <= 0 && !soldier.oomLock &&
+              (soldier.mana === undefined || soldier.mana >= (stats.slowCost || 0)) &&
+              // Healers conserve mana: below 50% only heal (skip slow)
+              ((manaMax && soldier.mana !== undefined) ? (soldier.mana / manaMax) >= 0.5 : true)
+            ) {
+              if (stats.slowCost) {
+                soldier.mana = Math.max(0, (soldier.mana || 0) - stats.slowCost);
+                if (soldier.manaBar) updateSoldierManaBar(soldier);
+              }
+              soldier.slowCooldownTimer = stats.slowCooldown || 6; if ((soldier.mana || 0) <= 0 && (soldier.manaMax || stats.manaMax || 0)) soldier.oomLock = true; const slowProj = { originType: "healer", ownerId: soldier.id, x: soldier.x, y: soldier.y - 10, targetType: "enemy", targetId: slowTarget.id, speed: 300, emoji: "🟡", hitEffect: "✨", status: { kind: "slow", amount: stats.slowAmount, duration: stats.slowDuration }, tag: "slow" }; launchProjectile(slowProj);
+              spawnEffect(slowTarget.x, slowTarget.y, "🌀");
+            }
+          }
+        }
+
+        function findWoundedAlly(origin, radius, thresholdRatio) {
+          let chosen = null;
+          let lowestRatio = thresholdRatio ?? 0.75;
+          const limit = radius || 240;
+          for (const ally of soldiers) {
+            if (!ally || ally.removed || ally.id === origin.id) {
+              continue;
+            }
+            if (ally.health >= ally.maxHealth) {
+              continue;
+            }
+            const ratio = ally.health / ally.maxHealth;
+            const dist = distancePoints(origin.x, origin.y, ally.x, ally.y);
+            if (dist > limit) {
+              continue;
+            }
+            if (ratio > lowestRatio) {
+              continue;
+            }
+            if (!chosen || ratio < lowestRatio || dist < distancePoints(origin.x, origin.y, chosen.x, chosen.y)) {
+              chosen = ally;
+              lowestRatio = ratio;
+            }
+          }
+          if (chosen) {
+            return chosen;
+          }
+          let fallback = null;
+          let fallbackRatio = 1;
+          for (const ally of soldiers) {
+            if (!ally || ally.removed || ally.id === origin.id) {
+              continue;
+            }
+            if (ally.health >= ally.maxHealth) {
+              continue;
+            }
+            const dist = distancePoints(origin.x, origin.y, ally.x, ally.y);
+            if (dist > limit) {
+              continue;
+            }
+            const ratio = ally.health / ally.maxHealth;
+            if (!fallback || ratio < fallbackRatio) {
+              fallback = ally;
+              fallbackRatio = ratio;
+            }
+          }
+          return fallback;
+        }
+
+        function fireSoldierProjectile(soldier, target) {
+          const projectileStats = soldier.stats.projectile || null;
+          // If this unit uses mana for attacks, require enough mana
+          const atkCost = soldier.stats.attackManaCost || 0;
+          if (soldier.oomLock) {
+            return;
+          }
+          if (atkCost > 0) {
+            const manaMax = soldier.manaMax || soldier.stats.manaMax || 0;
+            const mana = soldier.mana ?? manaMax;
+            if (mana < atkCost) {
+              return; // not enough mana to cast
+            }
+            soldier.mana = mana - atkCost;
+            if (soldier.manaBar) updateSoldierManaBar(soldier);
+            if ((soldier.mana || 0) <= 0 && manaMax) {
+              soldier.mana = 0;
+              soldier.oomLock = true;
+            }
+          }
+          const projectile = {
+            originType: "soldier",
+            ownerId: soldier.id,
+            x: soldier.x,
+            y: soldier.y - 12,
+            targetType: "enemy",
+            targetId: target.id,
+            speed: (projectileStats && projectileStats.speed) || 320,
+            damage: soldier.stats.damage,
+            emoji: (projectileStats && projectileStats.emoji) || soldier.stats.effect || "✨",
+            hitEffect: (projectileStats && projectileStats.hit) || soldier.stats.effect || "✨",
+          };
+          launchProjectile(projectile);
+          soldier.lockTimer = Math.max(soldier.lockTimer || 0, soldier.stats.attackHold || 0.26);
+        }
+
+        function updateEnemies(dt) {
+          for (let i = enemies.length - 1; i >= 0; i--) {
+            const enemy = enemies[i];
+            if (!enemy || enemy.removed) {
+              continue;
+            }
+            decayEnemyResistances(enemy, dt);
+            if (enemy.slowTimer > 0) {
+              enemy.slowTimer = Math.max(0, enemy.slowTimer - dt);
+              if (enemy.slowTimer <= 0) {
+                clearEnemyStatus(enemy, "slow");
+              }
+            } else if (enemy.slowAmount > 0) {
+              enemy.slowAmount = 0;
+            }
+            enemy.attackCooldown = Math.max(0, enemy.attackCooldown - dt);
+            enemy.statusIframes = Math.max(0, (enemy.statusIframes || 0) - dt);
+            enemy.lockTimer = Math.max(0, (enemy.lockTimer || 0) - dt);
+            enemy.stunTimer = Math.max(0, (enemy.stunTimer || 0) - dt);
+            if (enemy.stunTimer > 0) {
+              setEntityPosition(enemy.element, enemy.x, enemy.y);
+              continue;
+            }
+            if (enemy.element && enemy.element.classList.contains("shocked")) {
+              clearEnemyStatus(enemy, "shock");
+            }
+            // Non-boss units pause movement during attack lock; bosses and wraiths keep advancing
+            if (enemy.lockTimer > 0 && enemy.type !== "boss" && enemy.type !== "wraith") {
+              setEntityPosition(enemy.element, enemy.x, enemy.y);
+              continue;
+            }
+            let acted = false;
+
+            const soldierTarget = findClosestSoldier(enemy);
+            if (soldierTarget && !soldierTarget.removed) {
+              const dist = distancePoints(enemy.x, enemy.y, soldierTarget.x, soldierTarget.y);
+              if (enemy.type === "boss" || enemy.type === "wraith") {
+                // Boss custom behaviors
+                if (enemy.bossPower === "whirlwind") {
+                  const radius = 80;
+                  if (dist <= radius && enemy.attackCooldown <= 0) {
+                    for (const s of soldiers) {
+                      if (s && !s.removed) {
+                        const d = distancePoints(enemy.x, enemy.y, s.x, s.y);
+                        if (d <= radius) {
+                          s.health -= Math.round(enemy.stats.damage * 0.8);
+                          spawnEffect(s.x, s.y, "🌀");
+                          if (s.health <= 0) {
+                            removeSoldier(s);
+                          } else {
+                            updateSoldierHealthBar(s);
+                          }
+                        }
+                      }
+                    }
+                    enemy.attackCooldown = Math.max(enemy.stats.attackRate, 2.2);
+                    enemy.lockTimer = Math.max(enemy.lockTimer || 0, 0.4);
+                    acted = true;
+                  }
+                }
+                if (!acted) {
+                if (dist <= enemy.stats.attackRange * 0.95) {
+                  acted = true;
+                  if (enemy.attackCooldown <= 0) {
+                    fireEnemyProjectile(enemy, soldierTarget);
+                    enemy.attackCooldown = enemy.stats.attackRate;
+                  }
+                  // Boss (and wraith) keeps pushing forward while attacking (wraith at ~30% speed)
+                  enemy.y += getEnemySpeed(enemy, 0.3) * dt;
+                } else {
+                  stepTowards(enemy, soldierTarget.x, soldierTarget.y, getEnemySpeed(enemy, 0.9), dt);
+                  acted = true;
+                }
+                }
+              } else if (enemy.type === "ranged") {
+                if (dist <= enemy.stats.attackRange * 0.95) {
+                  acted = true;
+                  if (enemy.attackCooldown <= 0) {
+                    fireEnemyProjectile(enemy, soldierTarget);
+                    enemy.attackCooldown = enemy.stats.attackRate;
+                  }
+                } else {
+                  stepTowards(enemy, soldierTarget.x, soldierTarget.y, getEnemySpeed(enemy, 0.9), dt);
+                  acted = true;
+                }
+              } else {
+                if (dist > enemy.stats.attackRange * 0.85) {
+                  stepTowards(enemy, soldierTarget.x, soldierTarget.y, getEnemySpeed(enemy), dt);
+                  acted = true;
+                } else {
+                  acted = true;
+                  if (enemy.attackCooldown <= 0) {
+                    soldierTarget.health -= enemy.stats.damage;
+                    spawnEffect(soldierTarget.x, soldierTarget.y, enemy.stats.effect);
+                    enemy.attackCooldown = enemy.stats.attackRate;
+                    enemy.lockTimer = Math.max(enemy.lockTimer || 0, enemy.stats.attackHold || 0.34);
+                    if (soldierTarget.health <= 0) {
+                      removeSoldier(soldierTarget);
+                    } else {
+                      updateSoldierHealthBar(soldierTarget);
+                    }
+                  }
+                }
+              }
+            }
+
+            if (!acted) {
+              if (enemy.type === "ranged" || enemy.type === "boss") {
+                const distBase = BASE_Y - enemy.y;
+                if (distBase <= enemy.stats.attackRange) {
+                  acted = true;
+                  if (enemy.attackCooldown <= 0) {
+                    fireEnemyProjectile(enemy, null, true);
+                    enemy.attackCooldown = enemy.stats.attackRate;
+                    enemy.lockTimer = Math.max(enemy.lockTimer || 0, enemy.stats.attackHold || 0.32);
+                  }
+                  if (enemy.type === "boss") {
+                    // Bosses inch forward while attacking the base too
+                    enemy.y += getEnemySpeed(enemy, 0.3) * dt;
+                  }
+                }
+              } else if (enemy.y >= BASE_Y - 38) {
+                acted = true;
+                if (enemy.attackCooldown <= 0) {
+                  spawnEffect(PATH_CENTER, BASE_Y - 20, enemy.stats.effect);
+                  damageBase(enemy.stats.damage, "melee");
+                  enemy.attackCooldown = enemy.stats.attackRate;
+                  enemy.lockTimer = Math.max(enemy.lockTimer || 0, enemy.stats.attackHold || 0.34);
+                }
+              }
+            }
+
+            if (!acted) {
+              if (!enemy.joined && enemy.y >= CONVERGE_Y) {
+                enemy.joined = true;
+              }
+              const desiredX = enemy.joined ? enemy.convergeTarget : enemy.spawnLaneX;
+              const dx = desiredX - enemy.x;
+              if (Math.abs(dx) > 3) {
+                enemy.x += Math.sign(dx) * getEnemySpeed(enemy, 0.55) * dt;
+              }
+              enemy.y += getEnemySpeed(enemy) * dt;
+              enemy.x = clamp(enemy.x, PATH_LEFT - 26, PATH_RIGHT + 26);
+            }
+
+            setEntityPosition(enemy.element, enemy.x, enemy.y);
+
+            if (enemy.y > FIELD_HEIGHT + 30) {
+              enemy.removed = true;
+              clearEnemyStatus(enemy, "shock");
+              if (enemy.element && enemy.element.parentNode) {
+                enemy.element.parentNode.removeChild(enemy.element);
+              }
+              enemies.splice(i, 1);
+              enemiesRemainingThisWave = Math.max(0, enemiesRemainingThisWave - 1);
+              damageBase(enemy.stats.damage * 2, "melee");
+              tryCompleteWave();
+            }
+          }
+          resolveCrowding(enemies, CROWD_MIN_DISTANCE, CROWD_SEPARATION_FORCE * 0.65);
+          for (const foe of enemies) {
+            if (!foe || foe.removed) {
+              continue;
+            }
+            setEntityPosition(foe.element, foe.x, foe.y);
+          }
+        }
+
+        function fireEnemyProjectile(enemy, soldierTarget, isBase = false) {
+          const projectileStats = enemy.stats.projectile;
+          const lockDuration = enemy.stats.attackHold || 0.32;
+          if (!projectileStats) {
+            // fallback melee poke when ranged stats missing
+            if (soldierTarget) {
+              soldierTarget.health -= enemy.stats.damage;
+              spawnEffect(soldierTarget.x, soldierTarget.y, enemy.stats.effect);
+              if (soldierTarget.health <= 0) {
+                removeSoldier(soldierTarget);
+              } else {
+                updateSoldierHealthBar(soldierTarget);
+              }
+            } else {
+              damageBase(enemy.stats.damage, "ranged");
+            }
+            enemy.lockTimer = Math.max(enemy.lockTimer || 0, lockDuration);
+            return;
+          }
+          const count = enemy.type === "boss" && enemy.bossPower === "triple" ? 3 : 1;
+          for (let k = 0; k < count; k += 1) {
+            const projectile = {
+              originType: "enemy",
+              ownerId: enemy.id,
+              x: enemy.x + (k === 0 ? -4 : k === 2 ? 4 : 0),
+              y: enemy.y - 10,
+              targetType: isBase ? "base" : "soldier",
+              targetId: isBase ? "base" : soldierTarget.id,
+              speed: projectileStats.speed,
+              damage: enemy.stats.damage,
+              emoji: projectileStats.emoji,
+              hitEffect: projectileStats.hit || enemy.stats.effect,
+              tag: (enemy.type === 'wraith' && enemy.bossPower === 'boomerang') ? 'boomerang' : undefined,
+            };
+            launchProjectile(projectile);
+          }
+          enemy.lockTimer = Math.max(enemy.lockTimer || 0, lockDuration);
+        }
+        function findEnemyForTower(tower) {
+          let chosen = null;
+          let furthest = -Infinity;
+          for (const enemy of enemies) {
+            if (!enemy || enemy.removed) {
+              continue;
+            }
+            const dist = distancePoints(tower.x, tower.y, enemy.x, enemy.y);
+            if (dist <= tower.range && enemy.y > furthest) {
+              chosen = enemy;
+              furthest = enemy.y;
+            }
+          }
+          return chosen;
+        }
+
+        function findClosestEnemy(origin, maxDistance = Infinity) {
+          let chosen = null;
+          let bestDist = Infinity;
+          for (const enemy of enemies) {
+            if (!enemy || enemy.removed) {
+              continue;
+            }
+            const dist = distancePoints(origin.x, origin.y, enemy.x, enemy.y);
+            if (dist <= maxDistance && dist < bestDist) {
+              bestDist = dist;
+              chosen = enemy;
+            }
+          }
+          return chosen;
+        }
+
+        function findClosestSoldier(enemy) {
+          let chosen = null;
+          let bestDist = Infinity;
+          for (const soldier of soldiers) {
+            if (!soldier || soldier.removed) {
+              continue;
+            }
+            const dist = distancePoints(enemy.x, enemy.y, soldier.x, soldier.y);
+            if (dist < bestDist) {
+              bestDist = dist;
+              chosen = soldier;
+            }
+          }
+          return chosen;
+        }
+
+        function findGuardianAnchor(soldier) {
+          // Prefer a healthy, non-retreating frontline guardian as the anchor.
+          const healthyFront = [];
+          const others = [];
+          for (const ally of soldiers) {
+            if (!ally || ally.removed || ally.id === soldier.id) continue;
+            if (!ally.stats?.isMelee) continue;
+            const hpRatio = ally.health / ally.maxHealth;
+            const healthy = hpRatio >= 0.65; // treat 65%+ as healthy
+            const frontline = ally.y <= CONVERGE_Y + 10; // near or above the line
+            const retreating = ally.tacticRetreat || ally.retreating;
+            if (healthy && frontline && !retreating) {
+              healthyFront.push(ally);
+            } else {
+              others.push(ally);
+            }
+          }
+          const pickFrontMost = (arr) => {
+            if (!arr.length) return null;
+            // front-most = smallest y; break ties by highest health
+            arr.sort((a, b) => (a.y - b.y) || (b.health / b.maxHealth - a.health / a.maxHealth));
+            return arr[0] || null;
+          };
+          return pickFrontMost(healthyFront) || pickFrontMost(others);
+        }
+
+        function getGuardianBacklinePosition(soldier, guardian) {
+          if (!guardian) {
+            return {
+              x: PATH_CENTER + (soldier.stats?.role === "healer" ? 24 : 60),
+              // Healers slightly ahead of arcanists when no guardian context
+              y: BASE_Y - (soldier.stats?.role === "healer" ? 110 : 72),
+            };
+          }
+          const serial = soldier.serial || 0;
+          const stagger = ((serial % 3) - 1) * 18;
+          const lateral = soldier.stats?.role === "healer" ? stagger * 0.8 : stagger;
+          const anchorX = clamp(guardian.x + lateral, PATH_LEFT - 80, PATH_RIGHT + 80);
+          // Healers should be closer to guardians than arcanists
+          const gap = soldier.stats?.role === "healer" ? 36 : 48; // increased a bit
+          let anchorY = guardian.y + gap;
+          // Enforce minimum distance below the bottom-most guardian
+          const bottomGY = getBottommostGuardianY();
+          if (Number.isFinite(bottomGY)) {
+            anchorY = Math.max(anchorY, bottomGY + BACKLINE_MIN_FROM_BOTTOM_GUARDIAN);
+          }
+          return { x: anchorX, y: anchorY };
+        }
+
+        function isBaseUnderThreat() {
+          for (const enemy of enemies) {
+            if (!enemy || enemy.removed) {
+              continue;
+            }
+            if (enemy.y >= BASE_Y - 120) {
+              return true;
+            }
+          }
+          return false;
+        }
+
+        function findRetreatAnchor() {
+          // Pick the healthiest non-retreating ally as an anchor.
+          let anchor = null;
+          let bestScore = -Infinity;
+          for (const ally of soldiers) {
+            if (!ally || ally.removed) continue;
+            if (ally.tacticRetreat || ally.retreating) continue;
+            const hpRatio = ally.health / ally.maxHealth;
+            // Favor healthier and more frontward units (smaller y)
+            const score = hpRatio * 1000 - ally.y; // larger is better
+            if (score > bestScore) {
+              bestScore = score;
+              anchor = ally;
+            }
+          }
+          return anchor;
+        }
+
+        function getRetreatPoint(soldier) {
+          const anchor = findRetreatAnchor();
+          if (anchor) {
+            // Stay behind the anchor so healers can reach easily
+            const gap = soldier.stats.isMelee ? 28 : 52;
+            const lateral = soldier.stats?.role === "healer" ? 18 : (soldier.stats.isMelee ? -24 : 36);
+            const x = clamp(anchor.x + lateral, PATH_LEFT - 80, PATH_RIGHT + 80);
+            const y = anchor.y + gap;
+            return { x, y };
+          }
+          // Fallback near base if no suitable anchor found
+          return {
+            x: PATH_CENTER + (soldier.stats.isMelee ? -70 : 70),
+            y: soldier.stats.isMelee ? BASE_Y - 32 : BASE_Y - 120,
+          };
+        }
+
+        function getEnemyReward(enemy) {
+          if (enemy && typeof enemy.dynamicReward === "number") {
+            return enemy.dynamicReward;
+          }
+          return enemy?.stats?.reward || 0;
+        }
+
+        function applyKnockback(enemy, amount) {
+          if (!enemy || enemy.removed) {
+            return;
+          }
+          enemy.y = Math.max(enemy.y - amount, PATH_TOP_OFFSET - 60);
+          setEntityPosition(enemy.element, enemy.x, enemy.y);
+        }
+
+        function ensureStatusBadge(enemy, emoji, kind = "generic") {
+          if (!enemy || enemy.removed) {
+            return null;
+          }
+          if (!enemy.statusBadge) {
+            const badge = document.createElement("div");
+            badge.className = "status-badge";
+            enemy.element.appendChild(badge);
+            enemy.statusBadge = badge;
+          }
+          enemy.statusBadge.dataset.kind = kind;
+          enemy.statusBadge.textContent = emoji;
+          return enemy.statusBadge;
+        }
+
+        function clearEnemyStatus(enemy, type) {
+          if (!enemy) {
+            return;
+          }
+          if (type === "shock") {
+            enemy.stunTimer = 0;
+            if (enemy.element) {
+              enemy.element.classList.remove("shocked");
+            }
+            if (enemy.statusBadge) {
+              if (enemy.statusBadge.dataset.kind === "shock") {
+                if (enemy.slowTimer > 0 && enemy.slowAmount > 0) {
+                  enemy.statusBadge.dataset.kind = "slow";
+                  enemy.statusBadge.textContent = "🌀";
+                } else {
+                  if (enemy.statusBadge.parentNode) {
+                    enemy.statusBadge.parentNode.removeChild(enemy.statusBadge);
+                  }
+                  enemy.statusBadge = null;
+                }
+              }
+            }
+            return;
+          }
+          if (type === "slow") {
+            enemy.slowTimer = 0;
+            enemy.slowAmount = 0;
+            if (enemy.statusBadge) {
+              if (enemy.statusBadge.dataset.kind === "slow") {
+                if (enemy.stunTimer > 0) {
+                  enemy.statusBadge.dataset.kind = "shock";
+                  enemy.statusBadge.textContent = "⚡";
+                  if (enemy.element) {
+                    enemy.element.classList.add("shocked");
+                  }
+                } else {
+                  if (enemy.statusBadge.parentNode) {
+                    enemy.statusBadge.parentNode.removeChild(enemy.statusBadge);
+                  }
+                  enemy.statusBadge = null;
+                }
+              }
+            }
+            return;
+          }
+          if (enemy.statusBadge && enemy.statusBadge.parentNode) {
+            enemy.statusBadge.parentNode.removeChild(enemy.statusBadge);
+            enemy.statusBadge = null;
+          }
+        }
+
+        function consumeStatusResistance(enemy, key) {
+          if (!enemy) {
+            return 1;
+          }
+          if (!enemy.resistances) {
+            enemy.resistances = {};
+          }
+          if (!enemy.resistanceTimers) {
+            enemy.resistanceTimers = {};
+          }
+          const cap = (enemy.type === "boss" || enemy.type === 'wraith') ? STATUS_RESIST_CAP.boss : STATUS_RESIST_CAP.default;
+          const current = typeof enemy.resistances[key] === "number" ? enemy.resistances[key] : 1;
+          let effectiveness = Math.max(cap, Math.min(1, current));
+          if (enemy.type === "boss" || enemy.type === 'wraith') {
+            // Bosses are 90% resistant this wave
+            effectiveness = Math.max(cap, effectiveness * 0.1);
+          }
+          const next = Math.max(cap, effectiveness * STATUS_RESIST_STEP);
+          enemy.resistances[key] = next;
+          enemy.resistanceTimers[key] = STATUS_RESIST_DECAY_TIME;
+          if (enemy.type === 'boss' || enemy.type === 'wraith') {
+            enemy.statusIframes = Math.max(enemy.statusIframes || 0, 0.25);
+          }
+          return effectiveness;
+        }
+
+        function decayEnemyResistances(enemy, dt) {
+          if (!enemy || !enemy.resistanceTimers) {
+            return;
+          }
+          for (const key of Object.keys(enemy.resistanceTimers)) {
+            const remaining = (enemy.resistanceTimers[key] || 0) - dt;
+            if (remaining <= 0) {
+              enemy.resistanceTimers[key] = 0;
+              if (enemy.resistances) {
+                enemy.resistances[key] = 1;
+              }
+            } else {
+              enemy.resistanceTimers[key] = remaining;
+            }
+          }
+        }
+
+        function applyShock(enemy, duration) {
+          if (!enemy || enemy.removed) {
+            return;
+          }
+          if ((enemy.statusIframes || 0) > 0) {
+            return;
+          }
+          const effectiveness = consumeStatusResistance(enemy, "shock");
+          const actualDuration = duration * effectiveness;
+          if (actualDuration <= 0.05) {
+            return;
+          }
+          enemy.stunTimer = Math.max(enemy.stunTimer || 0, actualDuration);
+          ensureStatusBadge(enemy, "⚡", "shock");
+          if (enemy.element) {
+            enemy.element.classList.add("shocked");
+          }
+          enemy.statusIframes = 0.25;
+        }
+
+        function applySlow(enemy, amount, duration) {
+          if (!enemy || enemy.removed) {
+            return;
+          }
+          if ((enemy.statusIframes || 0) > 0) {
+            return;
+          }
+
+          const effectiveness = consumeStatusResistance(enemy, "slow");
+          const actualAmount = Math.min(0.9, Math.max(0, amount * effectiveness));
+          const cap = enemy.type === "boss" ? 0.6 : 0.75;
+          const adjustedAmount = Math.min(cap, actualAmount);
+          const actualDuration = duration * effectiveness;
+          if (adjustedAmount <= 0.02 || actualDuration <= 0.1) {
+            return;
+          }
+          enemy.slowAmount = Math.max(enemy.slowAmount || 0, adjustedAmount);
+          enemy.slowTimer = Math.max(enemy.slowTimer || 0, actualDuration);
+        }
+
+        function applySplashDamage(x, y, projectile, primaryId) {
+          const radius = projectile.splash;
+          if (!radius) {
+            return;
+          }
+          const source = projectile.originType === "soldier"
+            ? { kind: "soldier", soldier: soldiers.find((s) => s.id === projectile.ownerId && !s.removed) }
+            : null;
+          for (const foe of [...enemies]) {
+            if (!foe || foe.removed || foe.id === primaryId) {
+              continue;
+            }
+            const dist = distancePoints(x, y, foe.x, foe.y);
+            if (dist <= radius) {
+              const falloff = dist <= radius * 0.5 ? 1 : 0.6;
+              const damage = Math.max(1, Math.round(projectile.damage * falloff));
+              spawnEffect(foe.x, foe.y, projectile.hitEffect || "💥");
+              applyDamageToEnemy(foe, damage, source);
+            }
+          }
+        }
+        function startWave() {
+          if (waveActive || gameOver) {
+            return;
+          }
+          if (!state.difficulty) {
+            // Require selecting difficulty before starting
+            if (difficultyOverlay) difficultyOverlay.classList.remove('hidden');
+            addLog('Pick a difficulty to begin.');
+            return;
+          }
+          state.wave += 1;
+          const planned = [];
+          const waveIntensity = 1 + Math.max(0, state.wave - 1) * 0.08;
+          const meleeCount = Math.round((4 + state.wave * 2) * waveIntensity * 0.75);
+          const rangedCount = Math.round(Math.max(1, (state.wave + 1) / 2) * 0.8);
+          const spacing = Math.max(0.68 - state.wave * 0.04, 0.28);
+          let timer = 0;
+          for (let i = 0; i < meleeCount; i += 1) {
+            planned.push({ time: timer, kind: "melee" });
+            timer += spacing;
+          }
+          let rangedTimer = spacing * 1.1;
+          for (let j = 0; j < rangedCount; j += 1) {
+            planned.push({ time: rangedTimer, kind: "ranged" });
+            rangedTimer += Math.max(spacing * 0.85, 0.33);
+          }
+          if (state.wave % 5 === 0) {
+            const bossDelay = Math.max(timer, rangedTimer) + 1.5;
+            const bossCount = Math.max(1, Math.floor(state.wave / 5));
+            for (let b = 0; b < bossCount; b += 1) {
+              planned.push({ time: bossDelay + b * 2.0, kind: "boss" });
+            }
+            // Special wraith boss every 10th wave
+            if (state.wave % 10 === 0) {
+              planned.push({ time: bossDelay + bossCount * 2.2, kind: "wraith" });
+            }
+          }
+          planned.sort((a, b) => a.time - b.time);
+          if (!planned.length) {
+            addLog("No enemies planned for this wave. Taking a breather.");
+            return;
+          }
+          spawnQueue = planned;
+          enemiesRemainingThisWave = planned.length;
+          waveClock = 0;
+          waveActive = true;
+          nextWaveButton.disabled = true;
+          nextWaveButton.textContent = "Start";
+          addLog(`Wave ${state.wave} incoming!`);
+          if (state.wave % 5 === 0) {
+            const bossCount = Math.max(1, Math.floor(state.wave / 5));
+            addLog(bossCount > 1 ? `Multiple boss signatures detected! ${bossCount} bosses incoming.` : "Boss signature detected! Brace for impact.");
+          }
+          updateHud();
+        }
+
+        function completeWave() {
+          if (!waveActive) {
+            return;
+          }
+          waveActive = false;
+          const reward = 50 + state.wave * 18;
+          state.coins += reward;
+          addLog(`Wave ${state.wave} cleared! Bonus +${reward} coins.`);
+          nextWaveButton.disabled = false;
+          nextWaveButton.textContent = "Start";
+          if (state.autoNextWave && !gameOver) {
+            nextWaveButton.textContent = "Start";
+            setTimeout(() => {
+              if (!waveActive && !gameOver && state.autoNextWave) {
+                startWave();
+              }
+            }, 2000);
+          }
+          let recovered = false;
+          let manaRestored = false;
+          // Keep current tactics mode persistent across waves
+          updateTacticButtons();
+          for (const soldier of soldiers) {
+            if (!soldier || soldier.removed) {
+              continue;
+            }
+            const heal = Math.round(soldier.maxHealth * 0.18);
+            if (heal > 0) {
+              soldier.health = Math.min(soldier.maxHealth, soldier.health + heal);
+              updateSoldierHealthBar(soldier);
+            }
+            const maxMana = soldier.manaMax || soldier.stats?.manaMax || 0;
+            if (maxMana) {
+              const before = soldier.mana ?? maxMana;
+              soldier.mana = maxMana;
+              if (soldier.manaBar && soldier.mana !== before) {
+                updateSoldierManaBar(soldier);
+                manaRestored = true;
+              }
+            }
+            soldier.retreating = false;
+            recovered = true;
+          }
+          if (recovered) {
+            addLog("Medics patch up the surviving troops.");
+          }
+          if (manaRestored) {
+            addLog("Arcane reserves replenished. Mana restored.");
+          }
+          updateHud();
+        }
+
+        function tryCompleteWave() {
+          if (!waveActive) {
+            return;
+          }
+          if (!spawnQueue.length && enemiesRemainingThisWave <= 0 && enemies.length === 0) {
+            completeWave();
+          }
+        }
+
+        function applyDamageToEnemy(enemy, amount, source = null) {
+          if (!enemy || enemy.removed) {
+            return false;
+          }
+          // Apply player damage multiplier (difficulty) to all player-sourced damage
+          let dmg = Math.max(0, Math.round((amount || 0) * (state.playerDamageMultiplier || 1)));
+          if (enemy.type === "boss" && enemy.bossPower === "sturdy") {
+            dmg = Math.round(dmg * (1 - (enemy.damageReduction || 0.35)));
+          }
+          enemy.health -= dmg;
+          if (enemy.health <= 0) {
+            eliminateEnemy(enemy, source);
+            return true;
+          }
+          updateEnemyHealth(enemy);
+          return false;
+        }
+
+        function eliminateEnemy(enemy, source = null) {
+          if (!enemy || enemy.removed) {
+            return;
+          }
+          enemy.removed = true;
+          clearEnemyStatus(enemy, "shock");
+          clearEnemyStatus(enemy, "slow");
+          if (enemy.element && enemy.element.parentNode) {
+            enemy.element.parentNode.removeChild(enemy.element);
+          }
+          // Boss coin drop
+          if (enemy.type === 'boss' || enemy.type === 'wraith') {
+            const drops = 6 + Math.floor(Math.random() * 5);
+            for (let i = 0; i < drops; i += 1) {
+              const coin = document.createElement('div');
+              coin.className = 'coin entity';
+              coin.textContent = '💰';
+              const offx = (Math.random() * 24 - 12);
+              const offy = (Math.random() * 8 - 4);
+              setEntityPosition(coin, enemy.x + offx, enemy.y + offy);
+              field.appendChild(coin);
+              setTimeout(() => { if (coin && coin.parentNode) coin.parentNode.removeChild(coin); }, 900 + Math.random() * 400);
+            }
+          }
+          spawnEffect(enemy.x, enemy.y, enemy.stats.effect);
+          const index = enemies.indexOf(enemy);
+          if (index !== -1) {
+            enemies.splice(index, 1);
+          }
+          enemiesRemainingThisWave = Math.max(0, enemiesRemainingThisWave - 1);
+          const reward = getEnemyReward(enemy);
+          if (reward > 0) {
+            state.coins += reward;
+          }
+          // Wraith split logic: split into two smaller wraiths up to 3 times (1->2->4->8)
+          if (enemy.type === 'wraith') {
+            const stage = enemy.splitStage || 0;
+            if (stage < 3) {
+              const childHealth = Math.max(40, Math.round((enemy.maxHealth || 200) * 0.45));
+              enemiesRemainingThisWave += 2;
+              for (let k = 0; k < 2; k += 1) {
+                setTimeout(() => {
+                  createEnemy('wraith');
+                  const spawned = enemies[enemies.length - 1];
+                  if (spawned) {
+                    spawned.x = enemy.x + (k === 0 ? -12 : 12);
+                    spawned.y = enemy.y - 8;
+                    spawned.health = childHealth;
+                    spawned.maxHealth = childHealth;
+                    spawned.splitStage = stage + 1;
+                    const scale = stage === 0 ? 0.85 : stage === 1 ? 0.7 : 0.55;
+                    if (spawned.element) spawned.element.style.transform = `translate(-50%, -50%) scale(${scale})`;
+                    if (spawned.element) setEntityPosition(spawned.element, spawned.x, spawned.y);
+                  }
+                }, 180 + k * 140);
+              }
+            }
+          }
+          if (source && source.kind === "soldier" && source.soldier) {
+            registerSoldierKill(source.soldier, enemy);
+          }
+          addLog(`${enemy.stats.name} defeated${reward ? ` (+${reward} coins)` : ''}.`);
+          state.totalKills = (state.totalKills || 0) + 1;
+          updateHud();
+          tryCompleteWave();
+        }
+
+        function removeSoldier(soldier) {
+          if (!soldier || soldier.removed) {
+            return;
+          }
+          // RIP effect where the unit fell
+          if (typeof soldier.x === 'number' && typeof soldier.y === 'number') {
+            const rip = document.createElement('div');
+            rip.className = 'rip-effect entity';
+            rip.textContent = '🪦';
+            setEntityPosition(rip, soldier.x, soldier.y - 8);
+            field.appendChild(rip);
+            setTimeout(() => { if (rip && rip.parentNode) rip.parentNode.removeChild(rip); }, 1700);
+          }
+          soldier.removed = true;
+          if (soldier.element && soldier.element.parentNode) {
+            soldier.element.parentNode.removeChild(soldier.element);
+          }
+          const index = soldiers.indexOf(soldier);
+          if (index !== -1) {
+            soldiers.splice(index, 1);
+          }
+          addLog(`${soldier.stats.name} has fallen.`);
+          if (pendingDismissId === soldier.id) pendingDismissId = null;
+          updateHud();
+          renderTroopPanel();
+        }
+
+        function dismissSoldier(soldier) {
+          if (!soldier || soldier.removed) {
+            return;
+          }
+          soldier.removed = true;
+          if (soldier.element && soldier.element.parentNode) {
+            soldier.element.parentNode.removeChild(soldier.element);
+          }
+          const index = soldiers.indexOf(soldier);
+          if (index !== -1) {
+            soldiers.splice(index, 1);
+          }
+          pendingDismissId = null;
+          addLog(`${soldier.stats.name} dismissed.`);
+          updateHud();
+          renderTroopPanel();
+        }
+
+        function updateEnemyHealth(enemy) {
+          if (!enemy || enemy.removed || !enemy.healthBar) {
+            return;
+          }
+          const ratio = clamp(enemy.health / enemy.maxHealth, 0, 1);
+          enemy.healthBar.style.width = `${ratio * 100}%`;
+        }
+
+        function updateSoldierHealthBar(soldier) {
+          if (!soldier || soldier.removed || !soldier.healthBar) {
+            return;
+          }
+          const ratio = clamp(soldier.health / soldier.maxHealth, 0, 1);
+          soldier.healthBar.style.width = `${ratio * 100}%`;
+          // Update compact dot and low-health styling
+          if (soldier.hpDot) {
+            soldier.hpDot.style.opacity = (0.15 + 0.85 * ratio).toFixed(2);
+          }
+          const thr = soldier.stats?.lowHealthThreshold ?? 0.35;
+          const low = ratio <= Math.max(0.25, thr);
+          if (soldier.element) {
+            soldier.element.classList.toggle('low-health', low);
+          }
+          // Update dashboard tile bar without re-render
+          if (soldier.dashboardHp) {
+            soldier.dashboardHp.style.width = `${Math.round(ratio * 100)}%`;
+          }
+        }
+
+        function updateSoldierManaBar(soldier) {
+          if (!soldier || soldier.removed || !soldier.manaBar) {
+            return;
+          }
+          const manaMax = soldier.manaMax || soldier.stats.manaMax || 0;
+          const mana = Math.max(0, Math.min(manaMax, soldier.mana || 0));
+          const ratio = manaMax ? mana / manaMax : 0;
+          soldier.manaBar.style.width = `${ratio * 100}%`;
+          if (soldier.mpDot) {
+            soldier.mpDot.style.opacity = (0.15 + 0.85 * ratio).toFixed(2);
+          }
+          if (soldier.dashboardMp) {
+            soldier.dashboardMp.style.width = `${Math.round(ratio * 100)}%`;
+          }
+        }
+
+        function damageBase(amount, source) {
+          if (gameOver) {
+            return;
+          }
+          state.baseHealth -= amount;
+          spawnEffect(PATH_CENTER, BASE_Y - 32, source === "ranged" ? "🔥" : "💥");
+          if (state.baseHealth <= 0) {
+            state.baseHealth = 0;
+            updateHud();
+            endGame();
+          } else {
+            updateHud();
+          }
+        }
+
+        function renderTroopPanel() {
+          if (!troopPanel) return;
+          const existing = new Map(Array.from(troopPanel.querySelectorAll('.troop-tile')).map(el => [el.getAttribute('data-id'), el]));
+          const present = new Set();
+          for (const s of soldiers) {
+            if (!s || s.removed) continue;
+            present.add(s.id);
+            let tile = existing.get(s.id);
+            if (!tile) {
+              tile = document.createElement('div');
+              tile.className = 'troop-tile';
+              tile.setAttribute('data-id', s.id);
+              const hasMana = !!(s.manaMax || s.stats.manaMax);
+              tile.innerHTML = `
+              <div class="tile-actions">
+                <button class="tiny-btn" data-action="confirm" data-id="${s.id}" title="Confirm">OK</button>
+                <button class="tiny-btn" data-action="cancel" data-id="${s.id}" title="Cancel">X</button>
+              </div>
+              <div class="troop-level">Lv<span class="lv"></span> <button class="tiny-btn dismiss-btn" data-action="select" data-id="${s.id}" title="Dismiss">X</button></div>
+              <div class="troop-emoji"></div>
+              <div class="bar health"><span class="hp" style="width:100%"></span></div>
+              ${hasMana ? '<div class="bar mana"><span class="mp" style="width:100%"></span></div>' : ''}
+            `;
+              troopPanel.appendChild(tile);
+            }
+            const lv = tile.querySelector('.lv');
+            const emoji = tile.querySelector('.troop-emoji');
+            const hp = tile.querySelector('.hp') || tile.querySelector('.health span');
+            const mp = tile.querySelector('.mp') || tile.querySelector('.mana span');
+            if (lv) lv.textContent = String(s.level);
+            if (emoji) emoji.textContent = s.stats.emoji;
+            if (hp) {
+              const hpRatio = clamp(s.health / s.maxHealth, 0, 1);
+              hp.style.width = `${Math.round(hpRatio * 100)}%`;
+            }
+            if (mp) {
+              const manaMax = s.manaMax || s.stats.manaMax || 0;
+              const mana = Math.max(0, Math.min(manaMax, s.mana || 0));
+              const mpRatio = manaMax ? mana / manaMax : 0;
+              mp.style.width = `${Math.round(mpRatio * 100)}%`;
+            }
+            tile.classList.toggle('pending', pendingDismissId === s.id);
+          }
+          for (const [id, el] of existing.entries()) {
+            if (!present.has(id)) el.remove();
+          }
+        }
+
+        function updateTroopTitleIcons() {
+          if (!troopTitleIcons) return;
+          const counts = {};
+          for (const s of soldiers) {
+            if (!s || s.removed) continue;
+            counts[s.type] = (counts[s.type] || 0) + 1;
+          }
+          const order = ['melee', 'ranged', 'healer'];
+          let html = '';
+          for (const key of order) {
+            const count = counts[key] || 0;
+            if (count <= 0) continue;
+            const emoji = (soldierCatalog[key] && soldierCatalog[key].emoji) ? soldierCatalog[key].emoji : '?';
+            html += `<span class="type"><span class="icon">${emoji}</span><span class="count">${count}</span></span>`;
+          }
+          troopTitleIcons.innerHTML = html;
+        }
+
+        if (troopPanel) {
+          troopPanel.addEventListener('click', (e) => {
+            const btn = (e.target && e.target.closest) ? e.target.closest('button.tiny-btn') : null;
+            if (!btn) return;
+            const action = btn.dataset.action;
+            const id = btn.dataset.id;
+            if (!action || !id) return;
+            if (action === 'select') {
+              const s = soldiers.find(x => x.id === id && !x.removed);
+              if (s) dismissSoldier(s);
+            } else if (action === 'cancel') {
+              pendingDismissId = null;
+              renderTroopPanel();
+            } else if (action === 'confirm') {
+              const s = soldiers.find(x => x.id === id && !x.removed);
+              if (s) dismissSoldier(s);
+            }
+          });
+          let currentHoverTile = null;
+          troopPanel.addEventListener('mousemove', (e) => {
+            const tile = (e.target && e.target.closest) ? e.target.closest('.troop-tile') : null;
+            if (tile !== currentHoverTile) {
+              if (currentHoverTile) currentHoverTile.classList.remove('hover');
+              if (tile) tile.classList.add('hover');
+              currentHoverTile = tile;
+            }
+          });
+          troopPanel.addEventListener('mouseleave', () => {
+            if (currentHoverTile) currentHoverTile.classList.remove('hover');
+            currentHoverTile = null;
+          });
+        }
+
+        function endGame() {
+          if (gameOver) {
+            return;
+          }
+          gameOver = true;
+          overlay.classList.remove("hidden");
+          finalStats.textContent = `Waves survived: ${state.wave}`;
+          nextWaveButton.disabled = true;
+          addLog("The base has fallen. Restart to try again.");
+        }
+
+        function selectTower(tower) {
+          selectedTowerId = tower ? tower.id : null;
+          towers.forEach((t) => {
+            if (t.element) {
+              t.element.classList.toggle("selected", t === tower);
+            }
+          });
+          if (tower) {
+            updateInspector(tower);
+            updateRangeOverlay(tower);
+          } else {
+            inspectorName.textContent = "Select a tower";
+            inspectorDetails.textContent = "Tap a tower on the path to inspect, upgrade, or sell it.";
+            inspectorHint.textContent = "";
+            upgradeButton.disabled = true;
+            upgradeButton.textContent = "Upgrade Tower";
+            sellButton.disabled = true;
+            rangeOverlay.classList.add("hidden");
+          }
+        }
+
+        function updateInspector(tower) {
+          inspectorName.textContent = `${tower.stats.name} Lv${tower.level}`;
+          const shotsPerSecond = (1 / tower.fireRate).toFixed(2);
+          inspectorDetails.innerHTML = `Damage: ${tower.damage}<br/>Range: ${Math.round(tower.range)} px<br/>Rate: ${shotsPerSecond} shots/sec`;
+          const upgradeCost = getUpgradeCost(tower);
+          if (tower.level >= tower.maxLevel) {
+            upgradeButton.disabled = true;
+            upgradeButton.textContent = "Fully Upgraded";
+            inspectorHint.textContent = "At max level.";
+          } else {
+            upgradeButton.disabled = state.coins < upgradeCost;
+            upgradeButton.textContent = `Upgrade (${upgradeCost} coins)`;
+            inspectorHint.textContent = state.coins < upgradeCost ? "Earn more coins to upgrade." : "Upgrade to increase damage, range, and fire rate.";
+          }
+          sellButton.disabled = false;
+          sellButton.textContent = `Sell (+${getSellValue(tower)})`;
+        }
+
+        function updateRangeOverlay(tower) {
+          const diameter = tower.range * 2;
+          rangeOverlay.style.width = `${diameter}px`;
+          rangeOverlay.style.height = `${diameter}px`;
+          rangeOverlay.style.left = `${tower.x}px`;
+          rangeOverlay.style.top = `${tower.y}px`;
+          rangeOverlay.classList.remove("hidden");
+        }
+
+        function upgradeTower(tower) {
+          if (tower.level >= tower.maxLevel) {
+            addLog("That tower is already fully upgraded.");
+            return;
+          }
+          const cost = getUpgradeCost(tower);
+          if (state.coins < cost) {
+            addLog("You need more coins for that upgrade.");
+            return;
+          }
+          state.coins -= cost;
+          tower.invested += cost;
+          tower.level += 1;
+          tower.damage = Math.round(tower.damage * 1.25);
+          tower.range = Math.round(tower.range * 1.07);
+          tower.fireRate = Math.max(0.35, tower.fireRate * 0.9);
+          tower.cooldown = 0;
+          if (tower.element) {
+            const levelEl = tower.element.querySelector(".level");
+            if (levelEl) {
+              levelEl.textContent = `Lv${tower.level}`;
+            }
+          }
+          addLog(`${tower.stats.name} upgraded to Lv${tower.level}.`);
+          updateHud();
+          updateInspector(tower);
+          updateRangeOverlay(tower);
+        }
+
+        function getUpgradeCost(tower) {
+          return Math.round(tower.stats.cost * (tower.level + 0.6));
+        }
+
+        function getRestPosition(soldier) {
+          if (soldier.stats?.role === "healer" || !soldier.stats.isMelee) {
+            if (!waveActive) {
+              return {
+                x: PATH_CENTER + (soldier.stats?.role === "healer" ? 32 : 78),
+                y: BASE_Y - 62,
+              };
+            }
+            const guardian = findGuardianAnchor(soldier);
+            if (guardian) {
+              return getGuardianBacklinePosition(soldier, guardian);
+            }
+            return {
+              x: PATH_CENTER + (soldier.stats?.role === "healer" ? 28 : 72),
+              y: BASE_Y - (soldier.stats?.role === "healer" ? 72 : 118),
+            };
+          }
+          if (!towers.length) {
+            return {
+              x: PATH_CENTER - 40,
+              y: BASE_Y - 54,
+            };
+          }
+          let closest = towers[0];
+          let bestDist = Infinity;
+          for (const tower of towers) {
+            const dist = distancePoints(soldier.x, soldier.y, tower.x, tower.y);
+            if (dist < bestDist) {
+              bestDist = dist;
+              closest = tower;
+            }
+          }
+          const offsetX = soldier.serial % 2 === 0 ? -18 : 18;
+          const offsetY = 46;
+          let ry = closest.y + offsetY;
+          // Ensure ranged/healers remain below the bottom-most guardian by a safe gap
+          if (soldier.stats && !soldier.stats.isMelee) {
+            const bottomGY = getBottommostGuardianY();
+            if (Number.isFinite(bottomGY)) {
+              ry = Math.max(ry, bottomGY + BACKLINE_MIN_FROM_BOTTOM_GUARDIAN);
+            }
+          }
+          return { x: closest.x + offsetX, y: ry };
+        }
+
+        function setBuildSelection(type) {
+          pendingBuildType = type;
+          buildButtons.forEach((button) => {
+            button.classList.toggle("build-selected", button.dataset.build === type);
+          });
+          if (!type) {
+            buildInfo.textContent = "Select a tower type to see its traits.";
+            return;
+          }
+          const catalog = towerCatalog[type];
+          if (catalog) {
+            buildInfo.innerHTML = `<strong>${catalog.name}</strong><br>${catalog.description}<br>Damage ${catalog.damage}, Range ${catalog.range}, Rate ${(1 / catalog.fireRate).toFixed(2)} shots/sec.`;
+          }
+        }
+
+        function updateHud() {
+          coinsLabel.textContent = state.coins.toString();
+          waveLabel.textContent = state.wave.toString();
+          if (difficultyDisplay) {
+            const diff = state.difficulty ? (state.difficulty.charAt(0).toUpperCase() + state.difficulty.slice(1)) : "-";
+            difficultyDisplay.textContent = diff;
+          }
+          if (difficultyShort) {
+            const d = state.difficulty ? state.difficulty.charAt(0).toUpperCase() : '-';
+            difficultyShort.textContent = d;
+          }
+          if (wavesTitle) {
+            const base = 'WAVES';
+            const diff = state.difficulty ? ` - ${state.difficulty.toUpperCase()}` : '';
+            const cheat = state.cheatUsed ? ' (CHEAT)' : '';
+            wavesTitle.textContent = base + diff + cheat;
+          }
+          const timerEl = document.getElementById('timer');
+          if (timerEl) {
+            const t = Math.floor(state.elapsedTime);
+            const mm = String(Math.floor(t / 60)).padStart(2, '0');
+            const ss = String(t % 60).padStart(2, '0');
+            timerEl.textContent = `${mm}:${ss}`;
+          }
+          baseLabel.textContent = `${Math.max(0, Math.round(state.baseHealth))} / ${state.maxBaseHealth}`;
+          if (enemyCountLabel) enemyCountLabel.textContent = enemies.length.toString();
+          if (troopCountLabel) troopCountLabel.textContent = soldiers.length.toString();
+          if (killCountLabel) killCountLabel.textContent = (state.totalKills || 0).toString();
+          if (selectedTowerId) {
+            const tower = towers.find((t) => t.id === selectedTowerId);
+            if (tower) {
+              updateInspector(tower);
+              updateRangeOverlay(tower);
+            } else {
+              selectTower(null);
+            }
+          }
+          updateTacticButtons();
+          updateTroopTitleIcons();
+          renderTroopPanel();
+        }
+
+        function spawnEffect(x, y, emoji) {
+          const effect = document.createElement("div");
+          effect.className = "effect entity";
+          effect.textContent = emoji;
+          setEntityPosition(effect, x, y);
+          field.appendChild(effect);
+          setTimeout(() => {
+            if (effect.parentNode) {
+              effect.parentNode.removeChild(effect);
+            }
+          }, 480);
+        }
+
+        function addLog(message) {
+          const entry = document.createElement("div");
+          entry.textContent = message;
+          log.prepend(entry);
+          while (log.childNodes.length > 8) {
+            log.removeChild(log.lastChild);
+          }
+          log.scrollTop = 0;
+        }
+
+        function setEntityPosition(element, x, y) {
+          element.style.left = `${x}px`;
+          element.style.top = `${y}px`;
+        }
+
+        function resolveCrowding(group, minDistance, force) {
+          const count = group.length;
+          for (let i = 0; i < count; i++) {
+            const a = group[i];
+            if (!a || a.removed) {
+              continue;
+            }
+            for (let j = i + 1; j < count; j++) {
+              const b = group[j];
+              if (!b || b.removed) {
+                continue;
+              }
+              const dx = a.x - b.x;
+              const dy = a.y - b.y;
+              const dist = Math.hypot(dx, dy);
+              if (!dist || dist >= minDistance) {
+                continue;
+              }
+              const push = (minDistance - dist) / minDistance;
+              const nx = dist ? dx / dist : Math.cos(Math.random() * Math.PI * 2);
+              const ny = dist ? dy / dist : Math.sin(Math.random() * Math.PI * 2);
+              const adjust = force * push * 0.5;
+              a.x = clamp(a.x + nx * adjust, PATH_LEFT - 90, PATH_RIGHT + 90);
+              a.y = clamp(a.y + ny * adjust, -40, FIELD_HEIGHT - 20);
+              b.x = clamp(b.x - nx * adjust, PATH_LEFT - 90, PATH_RIGHT + 90);
+              b.y = clamp(b.y - ny * adjust, -40, FIELD_HEIGHT - 20);
+            }
+          }
+        }
+
+        function distancePoints(x1, y1, x2, y2) {
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          return Math.hypot(dx, dy);
+        }
+
+        function stepTowards(entity, targetX, targetY, speed, dt) {
+          const dx = targetX - entity.x;
+          const dy = targetY - entity.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < 1e-2) {
+            return;
+          }
+          const maxStep = speed * dt;
+          const ratio = maxStep >= distance ? 1 : maxStep / distance;
+          entity.x += dx * ratio;
+          entity.y += dy * ratio;
+          entity.x = clamp(entity.x, PATH_LEFT - 90, PATH_RIGHT + 90);
+          entity.y = clamp(entity.y, -40, FIELD_HEIGHT - 20);
+        }
+
+        function clamp(value, min, max) {
+          return Math.max(min, Math.min(max, value));
+        }
+        function getEnemySpeed(enemy, factor = 1) {
+          const base = enemy?.stats?.speed || 0;
+          const boost = enemy?.speedBoost || 1;
+          const slowFactor = 1 - (enemy?.slowAmount || 0);
+          return base * boost * Math.max(0.1, slowFactor) * factor;
+        }
+
+        function getTopmostTowerY() {
+          if (!towers.length) {
+            return PATH_TOP_OFFSET + TILE_SIZE * 4; // safe fallback near top path region
+          }
+          let minY = Infinity;
+          for (const t of towers) {
+            if (t && t.y < minY) {
+              minY = t.y;
+            }
+          }
+          return minY;
+        }
+
+        function getBottommostTowerY() {
+          if (!towers.length) {
+            return BASE_Y - 54; // near base if no towers
+          }
+          let maxY = -Infinity;
+          for (const t of towers) {
+            if (t && t.y > maxY) {
+              maxY = t.y;
+            }
+          }
+          return maxY;
+        }
+        function getBottommostGuardianY() {
+          let maxY = -Infinity;
+          for (const s of soldiers) {
+            if (!s || s.removed) continue;
+            if (s.stats && s.stats.isMelee) {
+              if (s.y > maxY) maxY = s.y;
+            }
+          }
+          return maxY;
+        }
+
+        function getAdvanceLimitY(extraTiles) {
+          const topY = getTopmostTowerY();
+          const tiles = typeof extraTiles === "number" ? extraTiles : 1;
+          const limit = topY - TILE_SIZE * tiles;
+          return Math.max(PATH_TOP_OFFSET - 40, limit);
+        }
+
+        function updateTactics(dt) {
+          // Maintain partial-retreat dynamically: only wounded retreat
+          if (tactics.mode === 'retreat' && tactics.partialRetreat) {
+            for (const s of soldiers) {
+              if (!s || s.removed) continue;
+              s.tacticRetreat = isWounded(s);
+              if (!s.tacticRetreat) s.tacticRetreatComplete = false;
+            }
+          }
+          updateTacticButtons();
+        }
+
+        function updateTacticButtons() {
+          // Highlight current mode, no cooldowns
+          forwardButton.classList.toggle('build-selected', tactics.mode === 'forward');
+          middleButton.classList.toggle('build-selected', tactics.mode === 'middle');
+          retreatUIButton.classList.toggle('build-selected', tactics.mode === 'retreat');
+        }
+        function updateProjectiles(dt) {
+          for (let i = projectiles.length - 1; i >= 0; i--) {
+            const projectile = projectiles[i];
+            if (!projectile || projectile.removed) {
+              continue;
+            }
+            let targetX = projectile.x;
+            let targetY = projectile.y;
+            let targetEntity = null;
+            if (projectile.targetType === "enemy") {
+              targetEntity = enemies.find((enemy) => enemy.id === projectile.targetId && !enemy.removed);
+              if (!targetEntity) {
+                removeProjectileAt(i);
+                continue;
+              }
+              targetX = targetEntity.x;
+              targetY = targetEntity.y;
+            } else if (projectile.targetType === "soldier") {
+              targetEntity = soldiers.find((soldier) => soldier.id === projectile.targetId && !soldier.removed);
+              if (!targetEntity) {
+                removeProjectileAt(i);
+                continue;
+              }
+              targetX = targetEntity.x;
+              targetY = targetEntity.y;
+            } else if (projectile.targetType === "base") {
+              targetX = PATH_CENTER;
+              targetY = BASE_Y - 20;
+            }
+
+            const dx = targetX - projectile.x;
+            const dy = targetY - projectile.y;
+            const distance = Math.hypot(dx, dy);
+            const travel = projectile.speed * dt;
+            if (distance <= travel + 6) {
+              handleProjectileHit(projectile, targetEntity, targetX, targetY);
+              removeProjectileAt(i);
+              continue;
+            }
+            const ratio = travel / distance;
+            const prevX = projectile.x;
+            const prevY = projectile.y;
+            projectile.x += dx * ratio;
+            projectile.y += dy * ratio;
+            if (projectile.tag === 'boomerang') {
+              const img = document.createElement('div');
+              img.className = 'afterimage entity';
+              img.textContent = projectile.emoji || '🌀';
+              setEntityPosition(img, prevX, prevY);
+              field.appendChild(img);
+              setTimeout(() => { if (img && img.parentNode) img.parentNode.removeChild(img); }, 360);
+            }
+            setEntityPosition(projectile.element, projectile.x, projectile.y);
+          }
+        }
+
+        function handleProjectileHit(projectile, target, x, y) {
+          spawnEffect(x, y, projectile.hitEffect || "✨");
+          if (projectile.targetType === "enemy" && target) {
+            const impactX = target.x;
+            const impactY = target.y;
+            let sourceSoldier = null;
+            if (projectile.originType === "soldier") {
+              sourceSoldier = soldiers.find((soldier) => soldier.id === projectile.ownerId && !soldier.removed) || null;
+            }
+            const source = sourceSoldier ? { kind: "soldier", soldier: sourceSoldier } : null;
+            const killed = applyDamageToEnemy(target, projectile.damage, source);
+            if (!killed) {
+              if (projectile.knockback) {
+                applyKnockback(target, projectile.knockback);
+              }
+              if (projectile.status) {
+                if (projectile.status.kind === "shock") {
+                  applyShock(target, projectile.status.duration);
+                } else if (projectile.status.kind === "slow") {
+                  applySlow(target, projectile.status.amount || 0.35, projectile.status.duration || 2);
+                }
+              }
+            }
+            if (projectile.splash) {
+              applySplashDamage(impactX, impactY, projectile, target.id);
+            }
+            // Wraith boomerang: spawn a return projectile back to the enemy
+            if (projectile.tag === 'boomerang') {
+              const back = {
+                originType: "enemy",
+                ownerId: projectile.ownerId,
+                x: impactX,
+                y: impactY,
+                targetType: "enemy",
+                targetId: target.id,
+                speed: (projectile.speed || 320),
+                damage: projectile.damage,
+                emoji: projectile.emoji,
+                hitEffect: projectile.hitEffect,
+              };
+              launchProjectile(back);
+            }
+          } else if (projectile.targetType === "soldier" && target) {
+            if (projectile.healAmount) {
+              const before = Number.isFinite(target.health) ? target.health : 0;
+              const gain = Math.max(0, Math.round(projectile.healAmount));
+              target.health = Math.min(target.maxHealth, before + gain);
+              updateSoldierHealthBar(target);
+              // credit healer if available
+              if (projectile.originType === 'healer' && projectile.ownerId) {
+                const healer = soldiers.find(s => s.id === projectile.ownerId && !s.removed);
+                if (healer) registerSoldierHealing(healer, gain);
+              }
+              // add brief green aura
+              if (target.element) {
+                target.element.classList.add('healed');
+                setTimeout(() => { if (target.element) target.element.classList.remove('healed'); }, 500);
+              }
+            } else {
+              const current = Number.isFinite(target.health) ? target.health : 0;
+              const dmg = Math.max(0, Math.round(projectile.damage || 0));
+              target.health = Math.max(0, current - dmg);
+              if (target.health <= 0) {
+                removeSoldier(target);
+              } else {
+                updateSoldierHealthBar(target);
+              }
+            }
+            // Return path for wraith boomerang
+            if (projectile.tag === 'boomerang') {
+              const owner = enemies.find(e => e && !e.removed && e.id === projectile.ownerId);
+              if (owner) {
+                const back = {
+                  originType: "enemy",
+                  ownerId: projectile.ownerId,
+                  x: target.x,
+                  y: target.y,
+                  targetType: "enemy",
+                  targetId: owner.id,
+                  speed: (projectile.speed || 320),
+                  damage: projectile.damage,
+                  emoji: projectile.emoji,
+                  hitEffect: projectile.hitEffect,
+                };
+                launchProjectile(back);
+              }
+            }
+          } else if (projectile.targetType === "base") {
+            damageBase(projectile.damage, projectile.originType === "enemy" ? "ranged" : "melee");
+          }
+        }
+
+        function removeProjectileAt(index) {
+          const projectile = projectiles[index];
+          if (!projectile) {
+            return;
+          }
+          projectile.removed = true;
+          if (projectile.element && projectile.element.parentNode) {
+            projectile.element.parentNode.removeChild(projectile.element);
+          }
+          projectiles.splice(index, 1);
+        }
+
+        updateHud();
+      })();
+    </script>
+</body>
+
+</html>
+
+
+
+

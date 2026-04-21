@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>360 Panorama Viewer Demo</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: rgba(15, 23, 42, 0.9);
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #60a5fa;
+      --border: rgba(148, 163, 184, 0.25);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top, rgba(96,165,250,0.18), transparent 35%),
+        linear-gradient(180deg, #0f172a, #020617);
+      display: flex;
+      flex-direction: column;
+    }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 16px;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--panel);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+    }
+    .toolbar h1 {
+      font-size: 1rem;
+      margin: 0 16px 0 0;
+      white-space: nowrap;
+    }
+    .group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    .group input[type="range"] { width: 120px; }
+    .group input[type="file"] { max-width: 240px; }
+    button, input[type="file"]::file-selector-button {
+      border: 1px solid var(--border);
+      background: rgba(30, 41, 59, 0.95);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: transform 0.08s ease, background 0.15s ease;
+    }
+    button:hover, input[type="file"]::file-selector-button:hover {
+      background: rgba(51, 65, 85, 0.95);
+    }
+    button:active, input[type="file"]::file-selector-button:active {
+      transform: translateY(1px);
+    }
+    .viewer-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 320px;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      cursor: grab;
+    }
+    canvas.dragging { cursor: grabbing; }
+    .overlay {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      max-width: min(92vw, 560px);
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(2, 6, 23, 0.72);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(6px);
+      font-size: 0.92rem;
+      line-height: 1.45;
+      color: var(--text);
+    }
+    .overlay strong { color: white; }
+    .status { color: var(--accent); font-weight: 600; }
+    .help { color: var(--muted); }
+    .spacer { flex: 1; }
+    .badge {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+    @media (max-width: 840px) {
+      .toolbar { gap: 10px; }
+      .spacer { display: none; }
+      .toolbar h1 { width: 100%; margin-right: 0; }
+      .overlay { font-size: 0.86rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>360 Panorama Viewer Demo</h1>
+
+    <div class="group">
+      <label for="fileInput">Upload panorama</label>
+      <input id="fileInput" type="file" accept="image/*" />
+    </div>
+
+    <div class="group">
+      <label for="fovRange">Zoom</label>
+      <input id="fovRange" type="range" min="35" max="110" step="1" value="75" />
+      <span id="fovValue">75°</span>
+    </div>
+
+    <div class="group">
+      <label for="qualityRange">Quality</label>
+      <input id="qualityRange" type="range" min="20" max="100" step="5" value="50" />
+      <span id="qualityValue">50%</span>
+    </div>
+
+    <div class="group">
+      <label><input id="autoRotate" type="checkbox" /> Auto-rotate</label>
+    </div>
+
+    <div class="group">
+      <label><input id="invertHorizontal" type="checkbox" /> Invert horizontal drag</label>
+    </div>
+
+    <button id="resetBtn" type="button">Reset view</button>
+    <button id="fullscreenBtn" type="button">Fullscreen</button>
+
+    <div class="spacer"></div>
+    <div class="badge">Self-contained HTML • no external libraries</div>
+  </div>
+
+  <div class="viewer-wrap">
+    <canvas id="viewer"></canvas>
+    <div class="overlay">
+      <div><strong class="status" id="statusText">Upload a 360 panorama to begin.</strong></div>
+      <div class="help">
+        Drag to look around • scroll/pinch to zoom • double-click to reset.<br>
+        Best results come from <strong>equirectangular 2:1</strong> panorama images.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('viewer');
+      const ctx = canvas.getContext('2d', { alpha: false });
+      const statusText = document.getElementById('statusText');
+      const fileInput = document.getElementById('fileInput');
+      const fovRange = document.getElementById('fovRange');
+      const fovValue = document.getElementById('fovValue');
+      const qualityRange = document.getElementById('qualityRange');
+      const qualityValue = document.getElementById('qualityValue');
+      const autoRotateCheckbox = document.getElementById('autoRotate');
+      const invertHorizontalCheckbox = document.getElementById('invertHorizontal');
+      const resetBtn = document.getElementById('resetBtn');
+      const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+      const sourceCanvas = document.createElement('canvas');
+      const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+      const frameCanvas = document.createElement('canvas');
+      const frameCtx = frameCanvas.getContext('2d');
+
+      let sourcePixels = null;
+      let srcW = 0;
+      let srcH = 0;
+      let yaw = 0;
+      let pitch = 0;
+      let fov = 75 * Math.PI / 180;
+      let renderScale = 0.5;
+      let dragging = false;
+      let lastX = 0;
+      let lastY = 0;
+      let rafId = 0;
+      let autoRotateLastTime = 0;
+
+      function setStatus(msg) {
+        statusText.textContent = msg;
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function normalizeYaw(value) {
+        const twoPi = Math.PI * 2;
+        value = value % twoPi;
+        if (value > Math.PI) value -= twoPi;
+        if (value < -Math.PI) value += twoPi;
+        return value;
+      }
+
+      function resizeCanvas() {
+        const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+        const rect = canvas.getBoundingClientRect();
+        const w = Math.max(1, Math.floor(rect.width * dpr));
+        const h = Math.max(1, Math.floor(rect.height * dpr));
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+          requestRender();
+        }
+      }
+
+      function resetView() {
+        yaw = 0;
+        pitch = 0;
+        fov = 75 * Math.PI / 180;
+        fovRange.value = '75';
+        fovValue.textContent = '75°';
+        requestRender();
+      }
+
+      function loadImage(src, label = 'Image') {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            srcW = img.naturalWidth;
+            srcH = img.naturalHeight;
+            sourceCanvas.width = srcW;
+            sourceCanvas.height = srcH;
+            sourceCtx.clearRect(0, 0, srcW, srcH);
+            sourceCtx.drawImage(img, 0, 0);
+            sourcePixels = sourceCtx.getImageData(0, 0, srcW, srcH).data;
+            resetView();
+            const ratio = srcH ? (srcW / srcH).toFixed(3) : 'n/a';
+            setStatus(`${label} loaded (${srcW}×${srcH}, aspect ${ratio}:1)`);
+            resolve();
+          };
+          img.onerror = () => reject(new Error('Unable to load image.'));
+          img.src = src;
+        });
+      }
+
+      function requestRender() {
+        if (!rafId) rafId = requestAnimationFrame(renderFrame);
+      }
+
+      function sampleNearest(px, py) {
+        const x = Math.max(0, Math.min(srcW - 1, px | 0));
+        const y = Math.max(0, Math.min(srcH - 1, py | 0));
+        return ((y * srcW) + x) * 4;
+      }
+
+      function renderFrame(timestamp) {
+        rafId = 0;
+
+        if (!sourcePixels || !srcW || !srcH) {
+          ctx.fillStyle = 'black';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = 'white';
+          ctx.font = `${Math.max(14, Math.round(canvas.width / 45))}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('Upload a 360 image to begin', canvas.width / 2, canvas.height / 2);
+          return;
+        }
+
+        if (autoRotateCheckbox.checked) {
+          if (!autoRotateLastTime) autoRotateLastTime = timestamp;
+          const dt = Math.min(0.05, (timestamp - autoRotateLastTime) / 1000);
+          autoRotateLastTime = timestamp;
+          yaw = normalizeYaw(yaw + dt * 0.28);
+        } else {
+          autoRotateLastTime = 0;
+        }
+
+        const outW = Math.max(256, Math.round(canvas.width * renderScale));
+        const outH = Math.max(128, Math.round(canvas.height * renderScale));
+        if (frameCanvas.width !== outW || frameCanvas.height !== outH) {
+          frameCanvas.width = outW;
+          frameCanvas.height = outH;
+        }
+
+        const output = frameCtx.createImageData(outW, outH);
+        const data = output.data;
+
+        const aspect = outW / outH;
+        const tanHalfHFov = Math.tan(fov / 2);
+        const tanHalfVFov = tanHalfHFov / aspect;
+        const cosYaw = Math.cos(yaw), sinYaw = Math.sin(yaw);
+        const cosPitch = Math.cos(pitch), sinPitch = Math.sin(pitch);
+        const twoPi = Math.PI * 2;
+
+        let ptr = 0;
+        for (let y = 0; y < outH; y++) {
+          const ny = 1 - ((y + 0.5) / outH) * 2;
+          for (let x = 0; x < outW; x++) {
+            const nx = ((x + 0.5) / outW) * 2 - 1;
+
+            let dx = nx * tanHalfHFov;
+            let dy = ny * tanHalfVFov;
+            let dz = 1;
+
+            const invLen = 1 / Math.hypot(dx, dy, dz);
+            dx *= invLen; dy *= invLen; dz *= invLen;
+
+            const dyp = dy * cosPitch - dz * sinPitch;
+            const dzp = dy * sinPitch + dz * cosPitch;
+            const dxp = dx;
+
+            const dxw = dxp * cosYaw + dzp * sinYaw;
+            const dyw = dyp;
+            const dzw = -dxp * sinYaw + dzp * cosYaw;
+
+            const lon = Math.atan2(dxw, dzw);
+            const lat = Math.asin(clamp(dyw, -1, 1));
+
+            let u = (lon / twoPi + 0.5) * srcW;
+            let v = (0.5 - lat / Math.PI) * srcH;
+
+            if (u < 0) u += srcW;
+            if (u >= srcW) u -= srcW;
+            v = clamp(v, 0, srcH - 1);
+
+            const srcIdx = sampleNearest(u, v);
+            data[ptr++] = sourcePixels[srcIdx];
+            data[ptr++] = sourcePixels[srcIdx + 1];
+            data[ptr++] = sourcePixels[srcIdx + 2];
+            data[ptr++] = 255;
+          }
+        }
+
+        frameCtx.putImageData(output, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(frameCanvas, 0, 0, canvas.width, canvas.height);
+
+        if (autoRotateCheckbox.checked) requestRender();
+      }
+
+      function onPointerDown(e) {
+        dragging = true;
+        canvas.classList.add('dragging');
+        lastX = e.clientX;
+        lastY = e.clientY;
+        canvas.setPointerCapture?.(e.pointerId);
+      }
+
+      function onPointerMove(e) {
+        if (!dragging) return;
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        const horizontalDirection = invertHorizontalCheckbox.checked ? 1 : -1;
+        yaw = normalizeYaw(yaw + horizontalDirection * dx * 0.006);
+        pitch = clamp(pitch + dy * 0.0045, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
+        requestRender();
+      }
+
+      function onPointerUp(e) {
+        dragging = false;
+        canvas.classList.remove('dragging');
+        if (e.pointerId != null) canvas.releasePointerCapture?.(e.pointerId);
+      }
+
+      function onWheel(e) {
+        e.preventDefault();
+        const delta = Math.sign(e.deltaY) * 3;
+        const next = clamp((fov * 180 / Math.PI) + delta, 35, 110);
+        fov = next * Math.PI / 180;
+        fovRange.value = String(next);
+        fovValue.textContent = `${next}°`;
+        requestRender();
+      }
+
+      fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        setStatus(`Loading ${file.name}…`);
+        try {
+          const url = URL.createObjectURL(file);
+          await loadImage(url, file.name);
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          console.error(err);
+          setStatus('Failed to load the selected image.');
+        }
+      });
+
+      fovRange.addEventListener('input', () => {
+        fov = Number(fovRange.value) * Math.PI / 180;
+        fovValue.textContent = `${fovRange.value}°`;
+        requestRender();
+      });
+
+      qualityRange.addEventListener('input', () => {
+        renderScale = Number(qualityRange.value) / 100;
+        qualityValue.textContent = `${qualityRange.value}%`;
+        requestRender();
+      });
+
+      autoRotateCheckbox.addEventListener('change', requestRender);
+      resetBtn.addEventListener('click', resetView);
+
+      fullscreenBtn.addEventListener('click', async () => {
+        try {
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          } else {
+            await document.exitFullscreen();
+          }
+        } catch (err) {
+          console.warn(err);
+        }
+      });
+
+      canvas.addEventListener('pointerdown', onPointerDown);
+      canvas.addEventListener('pointermove', onPointerMove);
+      canvas.addEventListener('pointerup', onPointerUp);
+      canvas.addEventListener('pointercancel', onPointerUp);
+      canvas.addEventListener('pointerleave', onPointerUp);
+      canvas.addEventListener('wheel', onWheel, { passive: false });
+      canvas.addEventListener('dblclick', resetView);
+
+      let touchDist = null;
+      canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+          const [a, b] = e.touches;
+          touchDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        }
+      }, { passive: true });
+
+      canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && touchDist != null) {
+          const [a, b] = e.touches;
+          const newDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+          const delta = touchDist - newDist;
+          touchDist = newDist;
+          const next = clamp((fov * 180 / Math.PI) + delta * 0.05, 35, 110);
+          fov = next * Math.PI / 180;
+          fovRange.value = String(Math.round(next));
+          fovValue.textContent = `${Math.round(next)}°`;
+          requestRender();
+        }
+      }, { passive: true });
+
+      canvas.addEventListener('touchend', () => { touchDist = null; }, { passive: true });
+
+      window.addEventListener('resize', resizeCanvas);
+      window.addEventListener('keydown', (e) => {
+        const panStep = 0.08;
+        let handled = true;
+        switch (e.key) {
+          case 'ArrowLeft': yaw = normalizeYaw(yaw - panStep); break;
+          case 'ArrowRight': yaw = normalizeYaw(yaw + panStep); break;
+          case 'ArrowUp': pitch = clamp(pitch - panStep, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01); break;
+          case 'ArrowDown': pitch = clamp(pitch + panStep, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01); break;
+          case '+':
+          case '=': {
+            const next = clamp((fov * 180 / Math.PI) - 3, 35, 110);
+            fov = next * Math.PI / 180;
+            fovRange.value = String(next);
+            fovValue.textContent = `${next}°`;
+            break;
+          }
+          case '-': {
+            const next = clamp((fov * 180 / Math.PI) + 3, 35, 110);
+            fov = next * Math.PI / 180;
+            fovRange.value = String(next);
+            fovValue.textContent = `${next}°`;
+            break;
+          }
+          case 'r':
+          case 'R':
+            resetView();
+            return;
+          default:
+            handled = false;
+        }
+        if (handled) {
+          e.preventDefault();
+          requestRender();
+        }
+      });
+
+      resizeCanvas();
+      requestRender();
+    })();
+  </script>
+</body>
+</html>

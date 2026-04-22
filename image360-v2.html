@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -13,6 +14,12 @@
     "minEdge": 360,
     "preferSourceResolution": true
   },
+  "gifEncoding": {
+    "palette": "rgb332-fixed",
+    "dither": true,
+    "safeLiteralLzw": true,
+    "clearEveryCodes": 240
+  },
   "presets": {
     "Low": {
       "format": "gif",
@@ -20,35 +27,77 @@
       "frames": 24,
       "loopSeconds": 6,
       "webpQuality": 0.68,
-      "gifColors": 128,
-      "gifSamplePixels": 50000
+      "gifColors": 256,
+      "gifDither": false
     },
     "Medium": {
       "format": "webp",
       "resolutionMaxEdge": 800,
       "frames": 48,
       "loopSeconds": 8,
-      "webpQuality": 0.80,
-      "gifColors": 192,
-      "gifSamplePixels": 90000
+      "webpQuality": 0.8,
+      "gifColors": 256,
+      "gifDither": true
     },
     "High": {
       "format": "webp",
       "resolutionMaxEdge": "auto",
-      "frames": 96,
-      "loopSeconds": 10,
-      "webpQuality": 0.90,
+      "frames": 480,
+      "loopSeconds": 20,
+      "webpQuality": 0.9,
       "gifColors": 256,
-      "gifSamplePixels": 140000
+      "gifDither": true
     }
   },
   "editableDefaults": {
-    "formats": ["webp", "gif"],
-    "resolutionMaxEdges": ["auto", 480, 720, 800, 1080, 1280, 1440, 1600, 1920, "1920x1080"],
-    "frameCounts": [24, 36, 48, 72, 96, 120, 180],
-    "loopSeconds": [4, 6, 8, 10, 12, 16, 20],
-    "webpQualities": [0.55, 0.65, 0.75, 0.80, 0.85, 0.90, 0.95],
-    "gifColors": [64, 96, 128, 192, 256]
+    "formats": [
+      "webp",
+      "gif"
+    ],
+    "resolutionMaxEdges": [
+      "auto",
+      480,
+      720,
+      800,
+      1080,
+      1280,
+      1440,
+      1600,
+      1920,
+      "1920x1080"
+    ],
+    "frameCounts": [
+      24,
+      36,
+      48,
+      72,
+      96,
+      120,
+      180
+    ],
+    "loopSeconds": [
+      4,
+      6,
+      8,
+      10,
+      12,
+      16,
+      20
+    ],
+    "webpQualities": [
+      0.55,
+      0.65,
+      0.75,
+      0.8,
+      0.85,
+      0.9,
+      0.95
+    ],
+    "gifColors": [
+      64,
+      128,
+      256
+    ]
   }
 }
   </script>
@@ -67,9 +116,12 @@
       --shadow: 0 14px 42px rgba(0, 0, 0, 0.36);
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
-    html, body {
+    html,
+    body {
       width: 100%;
       height: 100%;
       margin: 0;
@@ -100,8 +152,13 @@
       touch-action: none;
     }
 
-    #glCanvas.dragging { cursor: grabbing; }
-    #overlayCanvas { pointer-events: none; }
+    #glCanvas.dragging {
+      cursor: grabbing;
+    }
+
+    #overlayCanvas {
+      pointer-events: none;
+    }
 
     #toolbar {
       position: absolute;
@@ -168,7 +225,9 @@
     }
 
     button:active,
-    .fileButton:active { transform: translateY(1px); }
+    .fileButton:active {
+      transform: translateY(1px);
+    }
 
     .fileButton {
       display: inline-flex;
@@ -177,9 +236,12 @@
       white-space: nowrap;
     }
 
-    input[type="file"] { display: none; }
+    input[type="file"] {
+      display: none;
+    }
 
-    input[type="text"], input[type="number"] {
+    input[type="text"],
+    input[type="number"] {
       width: 100%;
       min-width: 120px;
     }
@@ -209,7 +271,9 @@
       font-size: 13px;
     }
 
-    label.check input { accent-color: var(--accent); }
+    label.check input {
+      accent-color: var(--accent);
+    }
 
     .rangeLabel {
       display: inline-flex;
@@ -220,7 +284,9 @@
       white-space: nowrap;
     }
 
-    input[type="range"] { width: 118px; }
+    input[type="range"] {
+      width: 118px;
+    }
 
     #help {
       position: absolute;
@@ -241,7 +307,9 @@
       pointer-events: none;
     }
 
-    #help strong { color: var(--text); }
+    #help strong {
+      color: var(--text);
+    }
 
     #specs {
       position: absolute;
@@ -262,7 +330,9 @@
       line-height: 1.45;
     }
 
-    #specs[hidden] { display: none; }
+    #specs[hidden] {
+      display: none;
+    }
 
     #specs h2 {
       margin: 0 0 9px;
@@ -279,10 +349,22 @@
       margin: 0;
     }
 
-    #specs dt { color: var(--muted); }
-    #specs dd { margin: 0; overflow-wrap: anywhere; }
-    #specs .warn { color: #ffd27c; }
-    #specs .ok { color: var(--ok); }
+    #specs dt {
+      color: var(--muted);
+    }
+
+    #specs dd {
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+
+    #specs .warn {
+      color: #ffd27c;
+    }
+
+    #specs .ok {
+      color: var(--ok);
+    }
 
     #status {
       position: absolute;
@@ -307,9 +389,19 @@
       -webkit-backdrop-filter: blur(12px);
     }
 
-    #status.show { opacity: 1; }
-    #status.error { border-color: rgba(255, 132, 132, 0.45); color: #ffd6d6; }
-    #status.ok { border-color: rgba(166, 243, 166, 0.45); color: #e1ffe1; }
+    #status.show {
+      opacity: 1;
+    }
+
+    #status.error {
+      border-color: rgba(255, 132, 132, 0.45);
+      color: #ffd6d6;
+    }
+
+    #status.ok {
+      border-color: rgba(166, 243, 166, 0.45);
+      color: #e1ffe1;
+    }
 
     #dropOverlay {
       position: absolute;
@@ -338,7 +430,9 @@
       font-weight: 700;
     }
 
-    #app.dragTarget #dropOverlay { display: flex; }
+    #app.dragTarget #dropOverlay {
+      display: flex;
+    }
 
     .modal {
       position: absolute;
@@ -353,7 +447,9 @@
       -webkit-backdrop-filter: blur(8px);
     }
 
-    .modal[hidden] { display: none; }
+    .modal[hidden] {
+      display: none;
+    }
 
     .dialogCard {
       width: min(760px, calc(100vw - 36px));
@@ -392,6 +488,10 @@
       gap: 5px;
     }
 
+    .field[hidden] {
+      display: none !important;
+    }
+
     .field label {
       color: var(--muted);
       font-size: 12px;
@@ -399,7 +499,7 @@
     }
 
     .hint {
-      color: rgba(255,255,255,0.52);
+      color: rgba(255, 255, 255, 0.52);
       font-size: 12px;
       line-height: 1.35;
     }
@@ -407,9 +507,9 @@
     .previewBox {
       margin-top: 12px;
       padding: 10px 12px;
-      border: 1px solid rgba(255,255,255,0.13);
+      border: 1px solid rgba(255, 255, 255, 0.13);
       border-radius: 14px;
-      background: rgba(255,255,255,0.06);
+      background: rgba(255, 255, 255, 0.06);
       color: var(--muted);
       font-size: 13px;
       line-height: 1.45;
@@ -463,14 +563,35 @@
         max-height: 47vh;
         overflow: auto;
       }
-      .group { flex-wrap: wrap; }
-      #help { display: none; }
-      #specs { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 42vh; }
-      input[type="range"] { width: 92px; }
-      .dialogGrid { grid-template-columns: 1fr; }
+
+      .group {
+        flex-wrap: wrap;
+      }
+
+      #help {
+        display: none;
+      }
+
+      #specs {
+        top: auto;
+        bottom: 12px;
+        right: 12px;
+        left: 12px;
+        width: auto;
+        max-height: 42vh;
+      }
+
+      input[type="range"] {
+        width: 92px;
+      }
+
+      .dialogGrid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
+
 <body>
   <div id="app" aria-label="360 panorama viewer">
     <canvas id="glCanvas"></canvas>
@@ -507,7 +628,8 @@
       </div>
 
       <div class="group">
-        <button id="exportButton" type="button" title="Export a looped animation of the current rendered view">Export</button>
+        <button id="exportButton" type="button"
+          title="Export a looped animation of the current rendered view">Export</button>
         <button id="resetButton" type="button">Reset</button>
         <button id="fullscreenButton" type="button">Fullscreen</button>
       </div>
@@ -516,7 +638,8 @@
     <div id="urlDialog" class="modal" hidden aria-modal="true" role="dialog" aria-labelledby="urlDialogTitle">
       <form id="urlForm" class="dialogCard">
         <h2 id="urlDialogTitle">URL</h2>
-        <input id="urlInput" type="text" spellcheck="false" placeholder="https://example.com/panorama.jpg" aria-label="Image URL" />
+        <input id="urlInput" type="text" spellcheck="false" placeholder="https://example.com/panorama.jpg"
+          aria-label="Image URL" />
         <div class="dialogActions">
           <button id="urlCancelButton" type="button">Cancel</button>
           <button id="loadUrlButton" type="submit">Load</button>
@@ -527,7 +650,8 @@
     <div id="exportDialog" class="modal" hidden aria-modal="true" role="dialog" aria-labelledby="exportDialogTitle">
       <form id="exportForm" class="dialogCard">
         <h2 id="exportDialogTitle">Export animation</h2>
-        <p>Generate a loop from the current view. WebP uses browser compression quality; GIF uses a reduced color palette and is usually larger.</p>
+        <p>Generate a loop from the current view. WebP exposes quality/compression. GIF uses fixed RGB palettes;
+          compression quality is hidden for GIF.</p>
         <div class="dialogGrid">
           <div class="field">
             <label for="exportPreset">Preset</label>
@@ -545,7 +669,8 @@
           </div>
           <div class="field">
             <label for="exportResolution">Resolution quality / max side</label>
-            <input id="exportResolution" list="resolutionOptions" spellcheck="false" aria-label="Export resolution max side" />
+            <input id="exportResolution" list="resolutionOptions" spellcheck="false"
+              aria-label="Export resolution max side" />
             <datalist id="resolutionOptions"></datalist>
             <div class="hint">Use a number like 1080, “auto”, or an explicit size like 1280x720.</div>
           </div>
@@ -556,21 +681,24 @@
           </div>
           <div class="field">
             <label for="exportLoopSeconds">Loop duration / speed in seconds</label>
-            <input id="exportLoopSeconds" list="durationOptions" inputmode="decimal" aria-label="Export loop duration seconds" />
+            <input id="exportLoopSeconds" list="durationOptions" inputmode="decimal"
+              aria-label="Export loop duration seconds" />
             <datalist id="durationOptions"></datalist>
             <div class="hint">Higher values make the loop slower.</div>
           </div>
-          <div class="field">
-            <label for="exportWebpQuality">Compression quality</label>
-            <input id="exportWebpQuality" list="qualityOptions" inputmode="decimal" aria-label="WebP compression quality" />
+          <div class="field" id="exportWebpQualityField">
+            <label for="exportWebpQuality">WebP quality</label>
+            <input id="exportWebpQuality" list="qualityOptions" inputmode="decimal"
+              aria-label="WebP compression quality" />
             <datalist id="qualityOptions"></datalist>
-            <div class="hint">WebP: 0.55–0.95. Higher means cleaner and larger.</div>
+            <div class="hint">WebP only. 0.55–0.95; higher means cleaner and larger.</div>
           </div>
-          <div class="field">
+          <div class="field" id="exportGifColorsField" hidden>
             <label for="exportGifColors">GIF colors</label>
             <input id="exportGifColors" list="gifColorOptions" inputmode="numeric" aria-label="GIF colors" />
             <datalist id="gifColorOptions"></datalist>
-            <div class="hint">GIF supports up to 256 colors. Fewer colors compress smaller.</div>
+            <div class="hint">GIF only: fixed RGB palettes. Fewer colors may compress smaller; 256 usually looks
+              cleaner.</div>
           </div>
         </div>
         <div id="exportPreview" class="previewBox"></div>
@@ -584,11 +712,15 @@
     <div id="specs" hidden></div>
 
     <div id="help">
-      <strong>Controls:</strong> drag to look around or spin the snowball · wheel to zoom · Shift + drag to zoom · double-click to reset · drop an image · press Ctrl/Cmd+V to paste an image or URL · Export generates GIF/WebP loops. Remote URLs need CORS permission for WebGL.
+      <strong>Controls:</strong> drag to look around or spin the snowball · wheel to zoom · Shift + drag to zoom ·
+      double-click to reset · drop an image · press Ctrl/Cmd+V to paste an image or URL · Export generates GIF/WebP
+      loops. Remote URLs need CORS permission for WebGL.
     </div>
 
     <div id="status" role="status" aria-live="polite"></div>
-    <div id="dropOverlay"><div>Drop a panoramic image file or image URL</div></div>
+    <div id="dropOverlay">
+      <div>Drop a panoramic image file or image URL</div>
+    </div>
   </div>
 
   <script>
@@ -630,6 +762,8 @@
       const exportLoopSecondsEl = document.getElementById('exportLoopSeconds');
       const exportWebpQualityEl = document.getElementById('exportWebpQuality');
       const exportGifColorsEl = document.getElementById('exportGifColors');
+      const exportWebpQualityField = document.getElementById('exportWebpQualityField');
+      const exportGifColorsField = document.getElementById('exportGifColorsField');
       const exportPreviewEl = document.getElementById('exportPreview');
       const exportCancelButton = document.getElementById('exportCancelButton');
       const startExportButton = document.getElementById('startExportButton');
@@ -857,10 +991,11 @@
         const defaults = {
           defaultPreset: 'Medium',
           autoResolution: { maxEdgeCap: 1600, minEdge: 360, preferSourceResolution: true },
+          gifEncoding: { palette: 'rgb332-fixed', dither: true, safeLiteralLzw: true, clearEveryCodes: 240 },
           presets: {
-            Low: { format: 'gif', resolutionMaxEdge: 480, frames: 24, loopSeconds: 6, webpQuality: 0.68, gifColors: 128, gifSamplePixels: 50000 },
-            Medium: { format: 'webp', resolutionMaxEdge: 800, frames: 48, loopSeconds: 8, webpQuality: 0.80, gifColors: 192, gifSamplePixels: 90000 },
-            High: { format: 'webp', resolutionMaxEdge: 'auto', frames: 96, loopSeconds: 10, webpQuality: 0.90, gifColors: 256, gifSamplePixels: 140000 }
+            Low: { format: 'gif', resolutionMaxEdge: 480, frames: 24, loopSeconds: 6, webpQuality: 0.68, gifColors: 128, gifDither: false },
+            Medium: { format: 'webp', resolutionMaxEdge: 800, frames: 48, loopSeconds: 8, webpQuality: 0.80, gifColors: 256, gifDither: true },
+            High: { format: 'webp', resolutionMaxEdge: 'auto', frames: 96, loopSeconds: 10, webpQuality: 0.90, gifColors: 256, gifDither: true }
           },
           editableDefaults: {
             formats: ['webp', 'gif'],
@@ -868,7 +1003,7 @@
             frameCounts: [24, 36, 48, 72, 96, 120, 180],
             loopSeconds: [4, 6, 8, 10, 12, 16, 20],
             webpQualities: [0.55, 0.65, 0.75, 0.80, 0.85, 0.90, 0.95],
-            gifColors: [64, 96, 128, 192, 256]
+            gifColors: [64, 128, 256]
           }
         };
 
@@ -915,11 +1050,11 @@
         gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
           -1, -1,
-           1, -1,
-          -1,  1,
-          -1,  1,
-           1, -1,
-           1,  1
+          1, -1,
+          -1, 1,
+          -1, 1,
+          1, -1,
+          1, 1
         ]), gl.STATIC_DRAW);
 
         const aPosition = gl.getAttribLocation(program, 'aPosition');
@@ -1791,7 +1926,7 @@
         populateDatalist('frameOptions', EXPORT_CONFIG.editableDefaults.frameCounts || [24, 48, 72, 96]);
         populateDatalist('durationOptions', EXPORT_CONFIG.editableDefaults.loopSeconds || [6, 8, 10, 12]);
         populateDatalist('qualityOptions', EXPORT_CONFIG.editableDefaults.webpQualities || [0.75, 0.8, 0.85, 0.9]);
-        populateDatalist('gifColorOptions', EXPORT_CONFIG.editableDefaults.gifColors || [128, 192, 256]);
+        populateDatalist('gifColorOptions', EXPORT_CONFIG.editableDefaults.gifColors || [64, 128, 256]);
 
         const defaultPreset = EXPORT_CONFIG.defaultPreset || 'Medium';
         exportPresetEl.value = EXPORT_CONFIG.presets[defaultPreset] ? defaultPreset : 'Medium';
@@ -1799,15 +1934,22 @@
 
         exportPresetEl.addEventListener('change', () => {
           if (exportPresetEl.value !== 'Custom') applyExportPreset(exportPresetEl.value);
+          updateExportFieldVisibility();
           updateExportPreview();
         });
 
         for (const el of [exportFormatEl, exportResolutionEl, exportFramesEl, exportLoopSecondsEl, exportWebpQualityEl, exportGifColorsEl]) {
           el.addEventListener('input', () => {
             exportPresetEl.value = 'Custom';
+            updateExportFieldVisibility();
             updateExportPreview();
           });
         }
+        exportFormatEl.addEventListener('change', () => {
+          updateExportFieldVisibility();
+          updateExportPreview();
+        });
+        updateExportFieldVisibility();
       }
 
       function populateDatalist(id, values) {
@@ -1827,13 +1969,23 @@
         exportFramesEl.value = String(preset.frames ?? 48);
         exportLoopSecondsEl.value = String(preset.loopSeconds ?? 8);
         exportWebpQualityEl.value = String(preset.webpQuality ?? 0.8);
-        exportGifColorsEl.value = String(preset.gifColors ?? 192);
+        exportGifColorsEl.value = String(preset.gifColors ?? 256);
+        updateExportFieldVisibility();
         updateExportPreview();
+      }
+
+      function updateExportFieldVisibility() {
+        const format = String(exportFormatEl.value || '').trim().toLowerCase();
+        const isWebp = format === 'webp' || format === '';
+        const isGif = format === 'gif';
+        exportWebpQualityField.hidden = !isWebp;
+        exportGifColorsField.hidden = !isGif;
       }
 
       function openExportDialog() {
         if (state.exportBusy) return;
         exportDialog.hidden = false;
+        updateExportFieldVisibility();
         updateExportPreview();
       }
 
@@ -1848,10 +2000,12 @@
         const frames = clamp(Math.round(Number(exportFramesEl.value) || preset.frames || 48), 2, 360);
         const loopSeconds = clamp(Number(exportLoopSecondsEl.value) || preset.loopSeconds || 8, 0.2, 120);
         const webpQuality = clamp(Number(exportWebpQualityEl.value) || preset.webpQuality || 0.8, 0.05, 1);
-        const gifColors = clamp(Math.round(Number(exportGifColorsEl.value) || preset.gifColors || 192), 2, 256);
-        const gifSamplePixels = clamp(Math.round(Number(preset.gifSamplePixels) || 90000), 10000, 600000);
+        const gifPalette = fixedGifPaletteSpec(exportGifColorsEl.value || preset.gifColors || 256);
+        const gifDither = preset.gifDither !== undefined
+          ? Boolean(preset.gifDither)
+          : !(EXPORT_CONFIG.gifEncoding && EXPORT_CONFIG.gifEncoding.dither === false);
         const dimensions = resolveExportDimensions(exportResolutionEl.value || preset.resolutionMaxEdge || 800);
-        return { format, frames, loopSeconds, webpQuality, gifColors, gifSamplePixels, width: dimensions.width, height: dimensions.height, resolutionLabel: dimensions.label };
+        return { format, frames, loopSeconds, webpQuality, gifColors: gifPalette.count, gifLevels: gifPalette.levels, gifDither, width: dimensions.width, height: dimensions.height, resolutionLabel: dimensions.label };
       }
 
       function resolveExportDimensions(value) {
@@ -1900,13 +2054,14 @@
 
       function updateExportPreview() {
         if (!exportPreviewEl) return;
+        updateExportFieldVisibility();
         try {
           const options = getExportOptions();
           const delayMs = Math.max(10, Math.round((options.loopSeconds * 1000) / options.frames));
           const pixels = options.width * options.height * options.frames;
           const formatNote = options.format === 'webp'
-            ? `WebP quality ${options.webpQuality.toFixed(2)} with browser compression.`
-            : `GIF with ${options.gifColors} colors. GIF files can still be large at high resolutions.`;
+            ? `WebP quality ${options.webpQuality.toFixed(2)} with browser compression. GIF color settings do not apply to WebP.`
+            : `GIF uses a fixed ${options.gifColors}-color RGB palette. WebP compression quality does not apply to GIF.`;
           exportPreviewEl.innerHTML = `Output: <strong>${options.width} × ${options.height}px</strong> · ${options.frames} frames · ${options.loopSeconds.toFixed(1)}s loop · ${delayMs}ms/frame<br>${formatNote}<br>Workload: ${formatPixels(pixels)} rendered pixels.`;
         } catch (error) {
           exportPreviewEl.textContent = 'Adjust export settings to preview the output.';
@@ -1962,6 +2117,7 @@
           el.disabled = disabled;
         }
         startExportButton.textContent = disabled ? 'Generating…' : 'Generate';
+        if (!disabled) updateExportFieldVisibility();
       }
 
       function closeExportDialogAfterExport() {
@@ -2073,8 +2229,10 @@
 
       async function exportAnimatedGif(target, snapshot, options) {
         const frameCanvas = makeFrameCanvas(target.width, target.height);
-        const frames = [];
+        const indexedFrames = [];
         const delayCs = Math.max(1, Math.round((options.loopSeconds * 100) / options.frames));
+        const levels = options.gifLevels || fixedGifPaletteSpec(options.gifColors).levels;
+        const palette = buildFixedGifPalette(levels);
 
         for (let i = 0; i < options.frames; i++) {
           const { rgba, params } = renderExportFrame(target, snapshot, options, i);
@@ -2082,16 +2240,14 @@
           frameCanvas.ctx.putImageData(imageData, 0, 0);
           drawExportOverlayToCanvas(frameCanvas.ctx, target.width, target.height, params);
           const composited = frameCanvas.ctx.getImageData(0, 0, target.width, target.height).data;
-          frames.push(new Uint8ClampedArray(composited));
+          indexedFrames.push(quantizeFixedGifPalette(composited, target.width, target.height, levels, options.gifDither));
           setStatus(`Rendering GIF frame ${i + 1} / ${options.frames}…`, '', 0);
           await yieldToBrowser();
         }
 
-        setStatus('Building GIF color palette…', '', 0);
-        const palette = makePalette(frames, options.gifColors, options.gifSamplePixels);
-        setStatus('Compressing GIF frames…', '', 0);
-        const bytes = encodeGif(frames, target.width, target.height, palette, delayCs, (done, total) => {
-          if (done % 4 === 0 || done === total) setStatus(`Compressing GIF frame ${done} / ${total}…`, '', 0);
+        setStatus('Writing GIF with stable RGB palette…', '', 0);
+        const bytes = encodeIndexedGif(indexedFrames, target.width, target.height, palette, delayCs, (done, total) => {
+          if (done % 4 === 0 || done === total) setStatus(`Writing GIF frame ${done} / ${total}…`, '', 0);
         });
         return new Blob([bytes], { type: 'image/gif' });
       }
@@ -2206,6 +2362,114 @@
         bytes[offset + 1] = (value >> 8) & 255;
         bytes[offset + 2] = (value >> 16) & 255;
         bytes[offset + 3] = (value >> 24) & 255;
+      }
+
+      function fixedGifPaletteSpec(requestedColors) {
+        const requested = clamp(Math.round(Number(requestedColors) || 256), 2, 256);
+        if (requested <= 64) return { count: 64, levels: [4, 4, 4] };
+        if (requested <= 128) return { count: 128, levels: [4, 8, 4] };
+        if (requested <= 192) return { count: 192, levels: [6, 8, 4] };
+        return { count: 256, levels: [8, 8, 4] };
+      }
+
+      function buildFixedGifPalette(levels) {
+        const rLevels = levels[0];
+        const gLevels = levels[1];
+        const bLevels = levels[2];
+        const palette = [];
+        for (let r = 0; r < rLevels; r++) {
+          for (let g = 0; g < gLevels; g++) {
+            for (let b = 0; b < bLevels; b++) {
+              palette.push([
+                Math.round((r * 255) / Math.max(1, rLevels - 1)),
+                Math.round((g * 255) / Math.max(1, gLevels - 1)),
+                Math.round((b * 255) / Math.max(1, bLevels - 1))
+              ]);
+            }
+          }
+        }
+        while (palette.length < 256) palette.push([0, 0, 0]);
+        return palette.slice(0, 256);
+      }
+
+      function quantizeFixedGifPalette(data, width, height, levels, dither) {
+        const out = new Uint8Array(width * height);
+        const rLevels = levels[0];
+        const gLevels = levels[1];
+        const bLevels = levels[2];
+        const bayer = [
+          0, 8, 2, 10,
+          12, 4, 14, 6,
+          3, 11, 1, 9,
+          15, 7, 13, 5
+        ];
+
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const p = (y * width + x) * 4;
+            let r = data[p];
+            let g = data[p + 1];
+            let b = data[p + 2];
+
+            if (dither) {
+              const n = bayer[(y & 3) * 4 + (x & 3)] - 7.5;
+              r = clampInt(r + n * 5.0, 0, 255);
+              g = clampInt(g + n * 5.0, 0, 255);
+              b = clampInt(b + n * 8.0, 0, 255);
+            }
+
+            const ri = clampInt(Math.round((r * (rLevels - 1)) / 255), 0, rLevels - 1);
+            const gi = clampInt(Math.round((g * (gLevels - 1)) / 255), 0, gLevels - 1);
+            const bi = clampInt(Math.round((b * (bLevels - 1)) / 255), 0, bLevels - 1);
+            out[y * width + x] = (ri * gLevels + gi) * bLevels + bi;
+          }
+        }
+        return out;
+      }
+
+      function encodeIndexedGif(indexFrames, width, height, palette, delayCs, progress) {
+        const writer = new ByteWriter();
+        writer.ascii('GIF89a');
+        writer.u16(width);
+        writer.u16(height);
+        writer.byte(0xF7);
+        writer.byte(0);
+        writer.byte(0);
+
+        for (let i = 0; i < 256; i++) {
+          const color = palette[i] || [0, 0, 0];
+          writer.byte(color[0]);
+          writer.byte(color[1]);
+          writer.byte(color[2]);
+        }
+
+        writer.byte(0x21); writer.byte(0xFF); writer.byte(0x0B);
+        writer.ascii('NETSCAPE2.0');
+        writer.byte(0x03); writer.byte(0x01); writer.u16(0); writer.byte(0x00);
+
+        for (let i = 0; i < indexFrames.length; i++) {
+          writer.byte(0x21); writer.byte(0xF9); writer.byte(0x04);
+          writer.byte(0x00);
+          writer.u16(delayCs);
+          writer.byte(0);
+          writer.byte(0);
+
+          writer.byte(0x2C);
+          writer.u16(0); writer.u16(0); writer.u16(width); writer.u16(height);
+          writer.byte(0x00);
+
+          writer.byte(8);
+          const compressed = lzwEncode(indexFrames[i], 8);
+          writeSubBlocks(writer, compressed);
+          if (progress) progress(i + 1, indexFrames.length);
+        }
+
+        writer.byte(0x3B);
+        return writer.toUint8Array();
+      }
+
+      function clampInt(value, min, max) {
+        return Math.max(min, Math.min(max, Math.round(value)));
       }
 
       function makePalette(frames, wantedColors, sampleLimit) {
@@ -2361,6 +2625,49 @@
       }
 
       function lzwEncode(indices, minCodeSize) {
+        const gifEncoding = EXPORT_CONFIG.gifEncoding || {};
+        if (gifEncoding.safeLiteralLzw === true) {
+          return lzwEncodeLiteral(indices, minCodeSize, gifEncoding.clearEveryCodes);
+        }
+        return lzwEncodeCompressed(indices, minCodeSize);
+      }
+
+      function lzwEncodeLiteral(indices, minCodeSize, clearEveryCodes) {
+        const clearCode = 1 << minCodeSize;
+        const endCode = clearCode + 1;
+        const out = [];
+        let bitBuffer = 0;
+        let bitCount = 0;
+        const codeSize = minCodeSize + 1;
+        let codesSinceClear = 0;
+        const resetEvery = clamp(Math.round(Number(clearEveryCodes) || 240), 16, 250);
+
+        function writeCode(code) {
+          bitBuffer += code * Math.pow(2, bitCount);
+          bitCount += codeSize;
+          while (bitCount >= 8) {
+            out.push(bitBuffer & 255);
+            bitBuffer = Math.floor(bitBuffer / 256);
+            bitCount -= 8;
+          }
+        }
+
+        if (!indices.length) return new Uint8Array();
+        writeCode(clearCode);
+        for (let i = 0; i < indices.length; i++) {
+          writeCode(indices[i]);
+          codesSinceClear++;
+          if (codesSinceClear >= resetEvery && i < indices.length - 1) {
+            writeCode(clearCode);
+            codesSinceClear = 0;
+          }
+        }
+        writeCode(endCode);
+        if (bitCount > 0) out.push(bitBuffer & 255);
+        return new Uint8Array(out);
+      }
+
+      function lzwEncodeCompressed(indices, minCodeSize) {
         const clearCode = 1 << minCodeSize;
         const endCode = clearCode + 1;
         let nextCode = endCode + 1;
@@ -2371,11 +2678,11 @@
         let bitCount = 0;
 
         function writeCode(code) {
-          bitBuffer |= code << bitCount;
+          bitBuffer += code * Math.pow(2, bitCount);
           bitCount += codeSize;
           while (bitCount >= 8) {
             out.push(bitBuffer & 255);
-            bitBuffer >>= 8;
+            bitBuffer = Math.floor(bitBuffer / 256);
             bitCount -= 8;
           }
         }
@@ -2386,13 +2693,17 @@
           codeSize = minCodeSize + 1;
         }
 
+        function maybeGrowCodeSize() {
+          if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++;
+        }
+
         if (!indices.length) return new Uint8Array();
         writeCode(clearCode);
         let prefix = indices[0];
 
         for (let i = 1; i < indices.length; i++) {
           const k = indices[i];
-          const key = (prefix << 8) | k;
+          const key = prefix + ',' + k;
           const found = dict.get(key);
           if (found !== undefined) {
             prefix = found;
@@ -2400,7 +2711,7 @@
             writeCode(prefix);
             if (nextCode < 4096) {
               dict.set(key, nextCode++);
-              if (nextCode === (1 << codeSize) && codeSize < 12) codeSize++;
+              maybeGrowCodeSize();
             } else {
               writeCode(clearCode);
               resetDict();
@@ -2574,4 +2885,5 @@
     })();
   </script>
 </body>
+
 </html>

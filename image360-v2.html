@@ -1,0 +1,2577 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Self-contained 360° Panorama Viewer</title>
+
+  <script type="application/json" id="viewer-export-config">
+{
+  "defaultPreset": "Medium",
+  "autoResolution": {
+    "maxEdgeCap": 1600,
+    "minEdge": 360,
+    "preferSourceResolution": true
+  },
+  "presets": {
+    "Low": {
+      "format": "gif",
+      "resolutionMaxEdge": 480,
+      "frames": 24,
+      "loopSeconds": 6,
+      "webpQuality": 0.68,
+      "gifColors": 128,
+      "gifSamplePixels": 50000
+    },
+    "Medium": {
+      "format": "webp",
+      "resolutionMaxEdge": 800,
+      "frames": 48,
+      "loopSeconds": 8,
+      "webpQuality": 0.80,
+      "gifColors": 192,
+      "gifSamplePixels": 90000
+    },
+    "High": {
+      "format": "webp",
+      "resolutionMaxEdge": "auto",
+      "frames": 96,
+      "loopSeconds": 10,
+      "webpQuality": 0.90,
+      "gifColors": 256,
+      "gifSamplePixels": 140000
+    }
+  },
+  "editableDefaults": {
+    "formats": ["webp", "gif"],
+    "resolutionMaxEdges": ["auto", 480, 720, 800, 1080, 1280, 1440, 1600, 1920, "1920x1080"],
+    "frameCounts": [24, 36, 48, 72, 96, 120, 180],
+    "loopSeconds": [4, 6, 8, 10, 12, 16, 20],
+    "webpQualities": [0.55, 0.65, 0.75, 0.80, 0.85, 0.90, 0.95],
+    "gifColors": [64, 96, 128, 192, 256]
+  }
+}
+  </script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --panel: rgba(7, 12, 22, 0.74);
+      --panel-strong: rgba(7, 12, 22, 0.92);
+      --line: rgba(255, 255, 255, 0.16);
+      --text: rgba(255, 255, 255, 0.93);
+      --muted: rgba(255, 255, 255, 0.66);
+      --accent: #74d2ff;
+      --danger: #ff8484;
+      --ok: #a6f3a6;
+      --shadow: 0 14px 42px rgba(0, 0, 0, 0.36);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #02040a;
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    #app {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 50% 40%, #132138 0%, #050812 54%, #02040a 100%);
+      overflow: hidden;
+      user-select: none;
+    }
+
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #glCanvas {
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #glCanvas.dragging { cursor: grabbing; }
+    #overlayCanvas { pointer-events: none; }
+
+    #toolbar {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 5;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px) saturate(1.2);
+      -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    }
+
+    .group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+    }
+
+    button,
+    .fileButton,
+    select,
+    input[type="text"],
+    input[type="number"] {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.09);
+      border: 1px solid rgba(255, 255, 255, 0.17);
+      border-radius: 12px;
+      min-height: 34px;
+      padding: 0 12px;
+      font: inherit;
+      outline: none;
+    }
+
+    button[disabled],
+    input[disabled] {
+      cursor: wait;
+      opacity: 0.62;
+    }
+
+    button,
+    .fileButton,
+    select,
+    input[type="checkbox"],
+    input[type="range"] {
+      cursor: pointer;
+    }
+
+    button:hover,
+    .fileButton:hover,
+    select:hover,
+    input[type="text"]:focus,
+    input[type="number"]:focus {
+      border-color: rgba(116, 210, 255, 0.58);
+      background: rgba(116, 210, 255, 0.13);
+    }
+
+    button:active,
+    .fileButton:active { transform: translateY(1px); }
+
+    .fileButton {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+    }
+
+    input[type="file"] { display: none; }
+
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      min-width: 120px;
+    }
+
+    select {
+      min-width: 132px;
+      color: #111827;
+      background-color: #ffffff;
+    }
+
+    select option {
+      color: #111827;
+      background: #ffffff;
+    }
+
+    #modeSelect {
+      color: var(--text);
+      background-color: rgba(255, 255, 255, 0.09);
+    }
+
+    label.check {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    label.check input { accent-color: var(--accent); }
+
+    .rangeLabel {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    input[type="range"] { width: 118px; }
+
+    #help {
+      position: absolute;
+      left: 14px;
+      bottom: 14px;
+      z-index: 4;
+      max-width: min(760px, calc(100vw - 28px));
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: rgba(7, 12, 22, 0.58);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      pointer-events: none;
+    }
+
+    #help strong { color: var(--text); }
+
+    #specs {
+      position: absolute;
+      top: 86px;
+      right: 12px;
+      z-index: 4;
+      width: min(390px, calc(100vw - 24px));
+      max-height: calc(100vh - 114px);
+      overflow: auto;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel-strong);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    #specs[hidden] { display: none; }
+
+    #specs h2 {
+      margin: 0 0 9px;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    #specs dl {
+      display: grid;
+      grid-template-columns: 132px 1fr;
+      gap: 6px 12px;
+      margin: 0;
+    }
+
+    #specs dt { color: var(--muted); }
+    #specs dd { margin: 0; overflow-wrap: anywhere; }
+    #specs .warn { color: #ffd27c; }
+    #specs .ok { color: var(--ok); }
+
+    #status {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      z-index: 10;
+      transform: translateX(-50%);
+      max-width: min(860px, calc(100vw - 28px));
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: rgba(6, 11, 19, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: var(--shadow);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.35;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+      text-align: center;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    #status.show { opacity: 1; }
+    #status.error { border-color: rgba(255, 132, 132, 0.45); color: #ffd6d6; }
+    #status.ok { border-color: rgba(166, 243, 166, 0.45); color: #e1ffe1; }
+
+    #dropOverlay {
+      position: absolute;
+      inset: 0;
+      z-index: 7;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      background: rgba(4, 9, 18, 0.66);
+      border: 3px dashed rgba(116, 210, 255, 0.65);
+      pointer-events: none;
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+    }
+
+    #dropOverlay div {
+      max-width: 620px;
+      padding: 24px 28px;
+      border-radius: 24px;
+      background: rgba(7, 12, 22, 0.86);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      text-align: center;
+      box-shadow: var(--shadow);
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    #app.dragTarget #dropOverlay { display: flex; }
+
+    .modal {
+      position: absolute;
+      inset: 0;
+      z-index: 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(2, 4, 10, 0.58);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .modal[hidden] { display: none; }
+
+    .dialogCard {
+      width: min(760px, calc(100vw - 36px));
+      max-height: min(86vh, 760px);
+      overflow: auto;
+      padding: 18px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: var(--panel-strong);
+      box-shadow: var(--shadow);
+    }
+
+    .dialogCard h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .dialogCard p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .dialogGrid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 5px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.02em;
+    }
+
+    .hint {
+      color: rgba(255,255,255,0.52);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .previewBox {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.13);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.06);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .dialogActions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    #toolbar,
+    #help,
+    #specs {
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    #app.fullscreen-mode #toolbar {
+      opacity: 0;
+      transform: translateY(calc(-100% - 18px));
+      pointer-events: none;
+    }
+
+    #app.fullscreen-mode.fullscreen-ui-show #toolbar {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    #app.fullscreen-mode #help {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+
+    #app.fullscreen-mode #specs {
+      opacity: 0;
+      transform: translateY(-12px);
+      pointer-events: none;
+    }
+
+    #app.fullscreen-mode.fullscreen-ui-show #specs {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    @media (max-width: 760px) {
+      #toolbar {
+        align-items: stretch;
+        max-height: 47vh;
+        overflow: auto;
+      }
+      .group { flex-wrap: wrap; }
+      #help { display: none; }
+      #specs { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 42vh; }
+      input[type="range"] { width: 92px; }
+      .dialogGrid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" aria-label="360 panorama viewer">
+    <canvas id="glCanvas"></canvas>
+    <canvas id="overlayCanvas"></canvas>
+
+    <div id="toolbar">
+      <div class="group">
+        <label class="fileButton" title="Open an image file from your computer">
+          Open
+          <input id="fileInput" type="file" accept="image/*" />
+        </label>
+        <button id="pasteButton" type="button" title="Paste an image or image URL from the clipboard">Paste</button>
+        <button id="urlButton" type="button" title="Load an image from a URL">URL</button>
+      </div>
+
+      <div class="group">
+        <select id="modeSelect" aria-label="Viewing mode">
+          <option value="immersive">Immersive</option>
+          <option value="grid">Grid 4-up</option>
+          <option value="snowball">Snowball</option>
+        </select>
+        <label class="rangeLabel" title="Mouse wheel also zooms">
+          FOV
+          <input id="fovRange" type="range" min="25" max="110" value="75" />
+          <span id="fovValue">75°</span>
+        </label>
+      </div>
+
+      <div class="group">
+        <label class="check"><input id="autoRotate" type="checkbox" /> Auto-rotate</label>
+        <label class="check"><input id="invertControls" type="checkbox" /> Invert controls</label>
+        <label class="check"><input id="showRefs" type="checkbox" /> Grid</label>
+        <label class="check"><input id="showSpecs" type="checkbox" /> Specs</label>
+      </div>
+
+      <div class="group">
+        <button id="exportButton" type="button" title="Export a looped animation of the current rendered view">Export</button>
+        <button id="resetButton" type="button">Reset</button>
+        <button id="fullscreenButton" type="button">Fullscreen</button>
+      </div>
+    </div>
+
+    <div id="urlDialog" class="modal" hidden aria-modal="true" role="dialog" aria-labelledby="urlDialogTitle">
+      <form id="urlForm" class="dialogCard">
+        <h2 id="urlDialogTitle">URL</h2>
+        <input id="urlInput" type="text" spellcheck="false" placeholder="https://example.com/panorama.jpg" aria-label="Image URL" />
+        <div class="dialogActions">
+          <button id="urlCancelButton" type="button">Cancel</button>
+          <button id="loadUrlButton" type="submit">Load</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="exportDialog" class="modal" hidden aria-modal="true" role="dialog" aria-labelledby="exportDialogTitle">
+      <form id="exportForm" class="dialogCard">
+        <h2 id="exportDialogTitle">Export animation</h2>
+        <p>Generate a loop from the current view. WebP uses browser compression quality; GIF uses a reduced color palette and is usually larger.</p>
+        <div class="dialogGrid">
+          <div class="field">
+            <label for="exportPreset">Preset</label>
+            <select id="exportPreset" aria-label="Export preset">
+              <option>Low</option>
+              <option selected>Medium</option>
+              <option>High</option>
+              <option>Custom</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="exportFormat">Format</label>
+            <input id="exportFormat" list="formatOptions" spellcheck="false" aria-label="Export format" />
+            <datalist id="formatOptions"></datalist>
+          </div>
+          <div class="field">
+            <label for="exportResolution">Resolution quality / max side</label>
+            <input id="exportResolution" list="resolutionOptions" spellcheck="false" aria-label="Export resolution max side" />
+            <datalist id="resolutionOptions"></datalist>
+            <div class="hint">Use a number like 1080, “auto”, or an explicit size like 1280x720.</div>
+          </div>
+          <div class="field">
+            <label for="exportFrames">Frames</label>
+            <input id="exportFrames" list="frameOptions" inputmode="numeric" aria-label="Export frame count" />
+            <datalist id="frameOptions"></datalist>
+          </div>
+          <div class="field">
+            <label for="exportLoopSeconds">Loop duration / speed in seconds</label>
+            <input id="exportLoopSeconds" list="durationOptions" inputmode="decimal" aria-label="Export loop duration seconds" />
+            <datalist id="durationOptions"></datalist>
+            <div class="hint">Higher values make the loop slower.</div>
+          </div>
+          <div class="field">
+            <label for="exportWebpQuality">Compression quality</label>
+            <input id="exportWebpQuality" list="qualityOptions" inputmode="decimal" aria-label="WebP compression quality" />
+            <datalist id="qualityOptions"></datalist>
+            <div class="hint">WebP: 0.55–0.95. Higher means cleaner and larger.</div>
+          </div>
+          <div class="field">
+            <label for="exportGifColors">GIF colors</label>
+            <input id="exportGifColors" list="gifColorOptions" inputmode="numeric" aria-label="GIF colors" />
+            <datalist id="gifColorOptions"></datalist>
+            <div class="hint">GIF supports up to 256 colors. Fewer colors compress smaller.</div>
+          </div>
+        </div>
+        <div id="exportPreview" class="previewBox"></div>
+        <div class="dialogActions">
+          <button id="exportCancelButton" type="button">Cancel</button>
+          <button id="startExportButton" type="submit">Generate</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="specs" hidden></div>
+
+    <div id="help">
+      <strong>Controls:</strong> drag to look around or spin the snowball · wheel to zoom · Shift + drag to zoom · double-click to reset · drop an image · press Ctrl/Cmd+V to paste an image or URL · Export generates GIF/WebP loops. Remote URLs need CORS permission for WebGL.
+    </div>
+
+    <div id="status" role="status" aria-live="polite"></div>
+    <div id="dropOverlay"><div>Drop a panoramic image file or image URL</div></div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const app = document.getElementById('app');
+      const canvas = document.getElementById('glCanvas');
+      const overlayCanvas = document.getElementById('overlayCanvas');
+      const overlayCtx = overlayCanvas.getContext('2d');
+
+      const fileInput = document.getElementById('fileInput');
+      const pasteButton = document.getElementById('pasteButton');
+      const urlButton = document.getElementById('urlButton');
+      const urlDialog = document.getElementById('urlDialog');
+      const urlForm = document.getElementById('urlForm');
+      const urlInput = document.getElementById('urlInput');
+      const loadUrlButton = document.getElementById('loadUrlButton');
+      const urlCancelButton = document.getElementById('urlCancelButton');
+      const modeSelect = document.getElementById('modeSelect');
+      const fovRange = document.getElementById('fovRange');
+      const fovValue = document.getElementById('fovValue');
+      const autoRotateEl = document.getElementById('autoRotate');
+      const invertControlsEl = document.getElementById('invertControls');
+      const showRefsEl = document.getElementById('showRefs');
+      const showSpecsEl = document.getElementById('showSpecs');
+      const specsEl = document.getElementById('specs');
+      const exportButton = document.getElementById('exportButton');
+      const resetButton = document.getElementById('resetButton');
+      const fullscreenButton = document.getElementById('fullscreenButton');
+      const statusEl = document.getElementById('status');
+
+      const exportDialog = document.getElementById('exportDialog');
+      const exportForm = document.getElementById('exportForm');
+      const exportPresetEl = document.getElementById('exportPreset');
+      const exportFormatEl = document.getElementById('exportFormat');
+      const exportResolutionEl = document.getElementById('exportResolution');
+      const exportFramesEl = document.getElementById('exportFrames');
+      const exportLoopSecondsEl = document.getElementById('exportLoopSeconds');
+      const exportWebpQualityEl = document.getElementById('exportWebpQuality');
+      const exportGifColorsEl = document.getElementById('exportGifColors');
+      const exportPreviewEl = document.getElementById('exportPreview');
+      const exportCancelButton = document.getElementById('exportCancelButton');
+      const startExportButton = document.getElementById('startExportButton');
+
+      const MIN_FOV = 25;
+      const MAX_FOV = 110;
+      const DEG = Math.PI / 180;
+      const RAD = 180 / Math.PI;
+
+      const EXPORT_CONFIG = readExportConfig();
+
+      const state = {
+        yaw: 0,
+        pitch: 0,
+        fovDeg: 75,
+        mode: 'immersive',
+        dpr: 1,
+        cssWidth: 1,
+        cssHeight: 1,
+        lastFrameTime: 0,
+        lastSpecsUpdate: 0,
+        textureInfo: null,
+        maxTextureSize: 0,
+        maxRenderbufferSize: 0,
+        pointerWasMoved: false,
+        exportBusy: false,
+        lastExportUrl: ''
+      };
+
+      let gl;
+      let program;
+      let quadBuffer;
+      let texture;
+      let uniforms;
+      let statusTimer = 0;
+      let activePointers = new Map();
+      let dragStart = null;
+      let pinchStart = null;
+      let isDragging = false;
+      let lastObjectUrl = null;
+
+      const vertexSource = `
+        attribute vec2 aPosition;
+        varying vec2 vUv;
+        void main() {
+          vUv = aPosition * 0.5 + 0.5;
+          gl_Position = vec4(aPosition, 0.0, 1.0);
+        }
+      `;
+
+      const fragmentSource = `
+        #ifdef GL_FRAGMENT_PRECISION_HIGH
+        precision highp float;
+        #else
+        precision mediump float;
+        #endif
+
+        uniform sampler2D uTexture;
+        uniform vec2 uResolution;
+        uniform float uFov;
+        uniform float uPlanetScale;
+        uniform float uYaw;
+        uniform float uPitch;
+        uniform int uMode;
+        uniform bool uShowRefs;
+
+        varying vec2 vUv;
+
+        const float PI = 3.1415926535897932384626433832795;
+
+        vec3 rotateX(vec3 v, float a) {
+          float s = sin(a);
+          float c = cos(a);
+          return vec3(v.x, c * v.y - s * v.z, s * v.y + c * v.z);
+        }
+
+        vec3 rotateY(vec3 v, float a) {
+          float s = sin(a);
+          float c = cos(a);
+          return vec3(c * v.x - s * v.z, v.y, s * v.x + c * v.z);
+        }
+
+        float lineEvery(float angle, float stepSize, float width) {
+          float d = abs(mod(angle + 0.5 * stepSize, stepSize) - 0.5 * stepSize);
+          return 1.0 - smoothstep(width, width * 2.45, d);
+        }
+
+        float endpointSpot(vec3 dir, vec3 axis, float radius, float softness) {
+          float d = acos(clamp(dot(normalize(dir), normalize(axis)), -1.0, 1.0));
+          return 1.0 - smoothstep(radius, radius + softness, d);
+        }
+
+        vec4 samplePanorama(vec3 dir) {
+          dir = normalize(dir);
+          float lon = atan(dir.x, -dir.z);
+          float lat = asin(clamp(dir.y, -1.0, 1.0));
+          float u = fract(0.5 + lon / (2.0 * PI));
+          float v = clamp(0.5 - lat / PI, 0.0, 1.0);
+          return texture2D(uTexture, vec2(u, v));
+        }
+
+        vec3 applyReferences(vec3 color, vec3 dir) {
+          dir = normalize(dir);
+          float lon = atan(dir.x, -dir.z);
+          float lat = asin(clamp(dir.y, -1.0, 1.0));
+          float width = max(0.0022, uFov / max(uResolution.x, uResolution.y) * 2.25);
+
+          float meridians = lineEvery(lon, PI / 12.0, width);
+          float parallels = lineEvery(lat, PI / 12.0, width);
+          float globeGrid = max(meridians, parallels);
+          color = mix(color, vec3(1.0), globeGrid * 0.17);
+
+          float equator = 1.0 - smoothstep(width * 1.4, width * 3.7, abs(lat));
+          float xMeridian = lineEvery(lon - PI * 0.5, PI, width * 1.75);
+          float zMeridian = lineEvery(lon, PI, width * 1.75);
+
+          color = mix(color, vec3(0.16, 1.0, 0.35), equator * 0.42);
+          color = mix(color, vec3(1.0, 0.22, 0.18), xMeridian * 0.48);
+          color = mix(color, vec3(0.22, 0.58, 1.0), zMeridian * 0.48);
+
+          float xSpot = max(endpointSpot(dir, vec3(1.0, 0.0, 0.0), 0.028, 0.032), endpointSpot(dir, vec3(-1.0, 0.0, 0.0), 0.022, 0.034) * 0.70);
+          float ySpot = max(endpointSpot(dir, vec3(0.0, 1.0, 0.0), 0.028, 0.032), endpointSpot(dir, vec3(0.0, -1.0, 0.0), 0.022, 0.034) * 0.70);
+          float zSpot = max(endpointSpot(dir, vec3(0.0, 0.0, 1.0), 0.028, 0.032), endpointSpot(dir, vec3(0.0, 0.0, -1.0), 0.022, 0.034) * 0.70);
+
+          color = mix(color, vec3(1.0, 0.18, 0.15), xSpot * 0.82);
+          color = mix(color, vec3(0.16, 1.0, 0.35), ySpot * 0.82);
+          color = mix(color, vec3(0.22, 0.58, 1.0), zSpot * 0.82);
+
+          return color;
+        }
+
+        vec3 perspectiveRay(vec2 frag, vec2 origin, vec2 size, float yawOffset) {
+          vec2 localUv = (frag - origin) / size;
+          vec2 p = localUv * 2.0 - 1.0;
+          p.x *= size.x / size.y;
+          float t = tan(uFov * 0.5);
+          vec3 ray = normalize(vec3(p.x * t, p.y * t, -1.0));
+          ray = rotateX(ray, uPitch);
+          ray = rotateY(ray, uYaw + yawOffset);
+          return ray;
+        }
+
+        vec3 backgroundColor(vec2 frag) {
+          vec2 uv = frag / uResolution;
+          float glow = 1.0 - smoothstep(0.0, 0.92, length((uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0)));
+          return mix(vec3(0.012, 0.018, 0.035), vec3(0.055, 0.105, 0.18), glow);
+        }
+
+        vec3 snowballColor(vec2 frag, out vec3 outRay, out float inside) {
+          vec2 p = frag / uResolution * 2.0 - 1.0;
+          p.x *= uResolution.x / uResolution.y;
+          float zoomT = clamp((uFov - 25.0 * PI / 180.0) / (85.0 * PI / 180.0), 0.0, 1.0);
+          float radius = mix(0.98, 0.52, zoomT);
+          float r2 = dot(p, p);
+          float feather = max(0.0025, 3.0 / min(uResolution.x, uResolution.y));
+          inside = 1.0 - smoothstep(radius * radius, radius * radius + feather, r2);
+          if (inside <= 0.001) {
+            outRay = vec3(0.0, 0.0, -1.0);
+            return backgroundColor(frag);
+          }
+
+          float z = sqrt(max(0.0, radius * radius - r2)) / radius;
+          vec3 normal = normalize(vec3(p.x / radius, p.y / radius, z));
+          vec3 ray = vec3(normal.x, normal.y, -normal.z);
+          ray = rotateX(ray, uPitch);
+          ray = rotateY(ray, uYaw);
+          outRay = ray;
+
+          vec3 albedo = samplePanorama(ray).rgb;
+          vec3 lightDir = normalize(vec3(-0.48, 0.78, 0.72));
+          float diffuse = 0.48 + 0.62 * max(dot(normal, lightDir), 0.0);
+          float rim = pow(1.0 - max(normal.z, 0.0), 2.1) * 0.34;
+          float spec = pow(max(dot(reflect(-lightDir, normal), vec3(0.0, 0.0, 1.0)), 0.0), 32.0) * 0.25;
+          vec3 sphere = albedo * diffuse + rim * vec3(0.25, 0.42, 0.65) + spec;
+          sphere *= 1.0 - smoothstep(0.78, 1.0, length(p) / radius) * 0.18;
+          return mix(backgroundColor(frag), sphere, inside);
+        }
+
+        void main() {
+          vec2 frag = gl_FragCoord.xy;
+          vec3 ray;
+          vec3 color;
+          float canReference = 1.0;
+
+          if (uMode == 1) {
+            vec2 halfSize = uResolution * 0.5;
+            float col = step(halfSize.x, frag.x);
+            float top = step(halfSize.y, frag.y);
+            vec2 origin = vec2(col * halfSize.x, top * halfSize.y);
+            float offsetIndex = mix(2.0 + col, col, top);
+            float yawOffset = offsetIndex * PI * 0.5;
+            ray = perspectiveRay(frag, origin, halfSize, yawOffset);
+            color = samplePanorama(ray).rgb;
+
+            float splitX = 1.0 - step(1.65, abs(frag.x - halfSize.x));
+            float splitY = 1.0 - step(1.65, abs(frag.y - halfSize.y));
+            float splitLine = max(splitX, splitY);
+            color = mix(color, vec3(0.0), splitLine * 0.56);
+          } else if (uMode == 2) {
+            color = snowballColor(frag, ray, canReference);
+          } else {
+            ray = perspectiveRay(frag, vec2(0.0), uResolution, 0.0);
+            color = samplePanorama(ray).rgb;
+          }
+
+          if (uShowRefs && canReference > 0.25) {
+            color = applyReferences(color, ray);
+          }
+
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `;
+
+      function init() {
+        initWebGL();
+        createPlaceholderTexture();
+        bindEvents();
+        setupExportDialog();
+        resize();
+        setStatus('Loaded the built-in demo panorama. Open, drop, paste, or load a URL to replace it.', 'ok', 5200);
+        requestAnimationFrame(render);
+      }
+
+      function readExportConfig() {
+        const defaults = {
+          defaultPreset: 'Medium',
+          autoResolution: { maxEdgeCap: 1600, minEdge: 360, preferSourceResolution: true },
+          presets: {
+            Low: { format: 'gif', resolutionMaxEdge: 480, frames: 24, loopSeconds: 6, webpQuality: 0.68, gifColors: 128, gifSamplePixels: 50000 },
+            Medium: { format: 'webp', resolutionMaxEdge: 800, frames: 48, loopSeconds: 8, webpQuality: 0.80, gifColors: 192, gifSamplePixels: 90000 },
+            High: { format: 'webp', resolutionMaxEdge: 'auto', frames: 96, loopSeconds: 10, webpQuality: 0.90, gifColors: 256, gifSamplePixels: 140000 }
+          },
+          editableDefaults: {
+            formats: ['webp', 'gif'],
+            resolutionMaxEdges: ['auto', 480, 720, 800, 1080, 1280, 1440, 1600, 1920, '1920x1080'],
+            frameCounts: [24, 36, 48, 72, 96, 120, 180],
+            loopSeconds: [4, 6, 8, 10, 12, 16, 20],
+            webpQualities: [0.55, 0.65, 0.75, 0.80, 0.85, 0.90, 0.95],
+            gifColors: [64, 96, 128, 192, 256]
+          }
+        };
+
+        try {
+          const el = document.getElementById('viewer-export-config');
+          const parsed = JSON.parse(el ? el.textContent : '{}');
+          return deepMerge(defaults, parsed);
+        } catch (error) {
+          console.warn('Export config JSON could not be parsed; using defaults.', error);
+          return defaults;
+        }
+      }
+
+      function deepMerge(base, extra) {
+        if (!extra || typeof extra !== 'object') return base;
+        const out = Array.isArray(base) ? base.slice() : Object.assign({}, base);
+        for (const key of Object.keys(extra)) {
+          if (extra[key] && typeof extra[key] === 'object' && !Array.isArray(extra[key]) && base[key] && typeof base[key] === 'object' && !Array.isArray(base[key])) {
+            out[key] = deepMerge(base[key], extra[key]);
+          } else {
+            out[key] = extra[key];
+          }
+        }
+        return out;
+      }
+
+      function initWebGL() {
+        gl = canvas.getContext('webgl', {
+          alpha: false,
+          antialias: false,
+          depth: false,
+          stencil: false,
+          preserveDrawingBuffer: false
+        });
+
+        if (!gl) {
+          throw new Error('WebGL is not available in this browser.');
+        }
+
+        program = createProgram(vertexSource, fragmentSource);
+        gl.useProgram(program);
+
+        quadBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+          -1, -1,
+           1, -1,
+          -1,  1,
+          -1,  1,
+           1, -1,
+           1,  1
+        ]), gl.STATIC_DRAW);
+
+        const aPosition = gl.getAttribLocation(program, 'aPosition');
+        gl.enableVertexAttribArray(aPosition);
+        gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+
+        uniforms = {
+          texture: gl.getUniformLocation(program, 'uTexture'),
+          resolution: gl.getUniformLocation(program, 'uResolution'),
+          fov: gl.getUniformLocation(program, 'uFov'),
+          planetScale: gl.getUniformLocation(program, 'uPlanetScale'),
+          yaw: gl.getUniformLocation(program, 'uYaw'),
+          pitch: gl.getUniformLocation(program, 'uPitch'),
+          mode: gl.getUniformLocation(program, 'uMode'),
+          showRefs: gl.getUniformLocation(program, 'uShowRefs')
+        };
+
+        texture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.uniform1i(uniforms.texture, 0);
+
+        state.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        state.maxRenderbufferSize = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || state.maxTextureSize;
+      }
+
+      function createShader(type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          const log = gl.getShaderInfoLog(shader) || 'Unknown shader compile error';
+          gl.deleteShader(shader);
+          throw new Error(log);
+        }
+        return shader;
+      }
+
+      function createProgram(vsSource, fsSource) {
+        const vertex = createShader(gl.VERTEX_SHADER, vsSource);
+        const fragment = createShader(gl.FRAGMENT_SHADER, fsSource);
+        const linkedProgram = gl.createProgram();
+        gl.attachShader(linkedProgram, vertex);
+        gl.attachShader(linkedProgram, fragment);
+        gl.linkProgram(linkedProgram);
+        gl.deleteShader(vertex);
+        gl.deleteShader(fragment);
+        if (!gl.getProgramParameter(linkedProgram, gl.LINK_STATUS)) {
+          const log = gl.getProgramInfoLog(linkedProgram) || 'Unknown WebGL link error';
+          gl.deleteProgram(linkedProgram);
+          throw new Error(log);
+        }
+        return linkedProgram;
+      }
+
+      function createPlaceholderTexture() {
+        const c = document.createElement('canvas');
+        c.width = 2048;
+        c.height = 1024;
+        const ctx = c.getContext('2d');
+
+        const sky = ctx.createLinearGradient(0, 0, 0, c.height);
+        sky.addColorStop(0, '#182f5b');
+        sky.addColorStop(0.48, '#315d80');
+        sky.addColorStop(0.5, '#4f6b4b');
+        sky.addColorStop(1, '#181d18');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, c.width, c.height);
+
+        ctx.save();
+        ctx.globalAlpha = 0.32;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        for (let lon = -180; lon <= 180; lon += 15) {
+          const x = ((lon + 180) / 360) * c.width;
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, c.height);
+          ctx.stroke();
+        }
+        for (let lat = -75; lat <= 75; lat += 15) {
+          const y = ((90 - lat) / 180) * c.height;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(c.width, y);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        ctx.save();
+        ctx.strokeStyle = '#ff5548';
+        ctx.lineWidth = 7;
+        drawLongitudeLine(ctx, c, 90);
+        ctx.strokeStyle = '#55ff7a';
+        drawLatitudeLine(ctx, c, 0);
+        ctx.strokeStyle = '#58a6ff';
+        drawLongitudeLine(ctx, c, 0);
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
+        ctx.fillRect(0, c.height * 0.41, c.width, c.height * 0.18);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 72px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Self-contained 360° panorama viewer', c.width / 2, c.height * 0.49);
+        ctx.font = '36px system-ui, sans-serif';
+        ctx.fillText('Open, drop, paste, or load a 2:1 equirectangular image URL', c.width / 2, c.height * 0.545);
+        ctx.restore();
+
+        uploadTextureFromSource(c, {
+          source: 'Built-in demo panorama',
+          type: 'procedural canvas',
+          originalWidth: c.width,
+          originalHeight: c.height,
+          bytes: null,
+          url: '',
+          downscaled: false
+        });
+      }
+
+      function drawLongitudeLine(ctx, c, lonDegrees) {
+        const x1 = ((lonDegrees + 180) / 360) * c.width;
+        const x2 = (((lonDegrees + 360) + 180) / 360) * c.width;
+        for (const x of [x1, x2]) {
+          if (x >= 0 && x <= c.width) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, c.height);
+            ctx.stroke();
+          }
+        }
+      }
+
+      function drawLatitudeLine(ctx, c, latDegrees) {
+        const y = ((90 - latDegrees) / 180) * c.height;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(c.width, y);
+        ctx.stroke();
+      }
+
+      function bindEvents() {
+        window.addEventListener('resize', resize, { passive: true });
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('mousemove', handleFullscreenMouseMove, { passive: true });
+
+        fileInput.addEventListener('change', () => {
+          const file = fileInput.files && fileInput.files[0];
+          if (file) loadBlob(file, file.name || 'local image');
+          fileInput.value = '';
+        });
+
+        urlButton.addEventListener('click', openUrlDialog);
+        urlForm.addEventListener('submit', (event) => {
+          event.preventDefault();
+          loadUrlFromInput();
+        });
+        urlCancelButton.addEventListener('click', closeUrlDialog);
+        urlDialog.addEventListener('click', (event) => {
+          if (event.target === urlDialog) closeUrlDialog();
+        });
+        urlInput.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') closeUrlDialog();
+        });
+
+        pasteButton.addEventListener('click', pasteFromClipboardButton);
+        document.addEventListener('paste', handlePasteEvent);
+
+        modeSelect.addEventListener('change', () => {
+          state.mode = modeSelect.value;
+          setStatus(modeDescription(state.mode), 'ok', 2800);
+          updateSpecs(true);
+        });
+
+        fovRange.addEventListener('input', () => {
+          setFov(Number(fovRange.value));
+        });
+
+        showSpecsEl.addEventListener('change', () => {
+          specsEl.hidden = !showSpecsEl.checked;
+          updateSpecs(true);
+        });
+
+        resetButton.addEventListener('click', resetView);
+        canvas.addEventListener('dblclick', resetView);
+
+        fullscreenButton.addEventListener('click', async () => {
+          try {
+            if (document.fullscreenElement) {
+              await document.exitFullscreen();
+            } else {
+              await app.requestFullscreen();
+            }
+          } catch (error) {
+            setStatus('Fullscreen was blocked by the browser.', 'error', 3500);
+          }
+        });
+
+        exportButton.addEventListener('click', openExportDialog);
+        exportCancelButton.addEventListener('click', closeExportDialog);
+        exportDialog.addEventListener('click', (event) => {
+          if (event.target === exportDialog && !state.exportBusy) closeExportDialog();
+        });
+        exportForm.addEventListener('submit', (event) => {
+          event.preventDefault();
+          startExport();
+        });
+
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        canvas.addEventListener('pointerdown', handlePointerDown);
+        canvas.addEventListener('pointermove', handlePointerMove);
+        canvas.addEventListener('pointerup', handlePointerEnd);
+        canvas.addEventListener('pointercancel', handlePointerEnd);
+        canvas.addEventListener('lostpointercapture', handlePointerEnd);
+
+        app.addEventListener('dragenter', (event) => {
+          event.preventDefault();
+          app.classList.add('dragTarget');
+        });
+        app.addEventListener('dragover', (event) => {
+          event.preventDefault();
+          app.classList.add('dragTarget');
+        });
+        app.addEventListener('dragleave', (event) => {
+          if (event.target === app || event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight) {
+            app.classList.remove('dragTarget');
+          }
+        });
+        app.addEventListener('drop', handleDrop);
+      }
+
+      function handleFullscreenChange() {
+        const isFull = Boolean(document.fullscreenElement);
+        fullscreenButton.textContent = isFull ? 'Exit fullscreen' : 'Fullscreen';
+        app.classList.toggle('fullscreen-mode', isFull);
+        app.classList.toggle('fullscreen-ui-show', !isFull);
+        resize();
+      }
+
+      function handleFullscreenMouseMove(event) {
+        if (!document.fullscreenElement) return;
+        if (event.clientY <= 3 || urlDialog.hidden === false || exportDialog.hidden === false) {
+          app.classList.add('fullscreen-ui-show');
+        } else if (!document.querySelector('#toolbar:hover')) {
+          app.classList.remove('fullscreen-ui-show');
+        }
+      }
+
+      function openUrlDialog() {
+        urlDialog.hidden = false;
+        requestAnimationFrame(() => urlInput.focus());
+      }
+
+      function closeUrlDialog() {
+        urlDialog.hidden = true;
+      }
+
+      function loadUrlFromInput() {
+        const url = urlInput.value.trim();
+        if (!url) {
+          setStatus('Enter an image URL first.', 'error', 2500);
+          return;
+        }
+        closeUrlDialog();
+        loadImageUrl(url);
+      }
+
+      function handleDrop(event) {
+        event.preventDefault();
+        app.classList.remove('dragTarget');
+
+        const dt = event.dataTransfer;
+        if (!dt) return;
+
+        const file = Array.from(dt.files || []).find((f) => f.type.startsWith('image/'));
+        if (file) {
+          loadBlob(file, file.name || 'dropped image');
+          return;
+        }
+
+        const uri = dt.getData('text/uri-list') || dt.getData('text/plain');
+        if (uri && looksLikeImageUrl(uri.trim())) {
+          urlInput.value = uri.trim();
+          loadImageUrl(uri.trim());
+        } else {
+          setStatus('Drop an image file or a direct image URL.', 'error', 3200);
+        }
+      }
+
+      function handlePasteEvent(event) {
+        const clipboard = event.clipboardData;
+        if (!clipboard) return;
+
+        const items = Array.from(clipboard.items || []);
+        const imageItem = items.find((item) => item.kind === 'file' && item.type.startsWith('image/'));
+        if (imageItem) {
+          const file = imageItem.getAsFile();
+          if (file) {
+            event.preventDefault();
+            loadBlob(file, file.name || 'clipboard image');
+            return;
+          }
+        }
+
+        const textItem = items.find((item) => item.kind === 'string' && item.type === 'text/plain');
+        if (textItem) {
+          textItem.getAsString((text) => {
+            const value = (text || '').trim();
+            if (looksLikeImageUrl(value)) {
+              urlInput.value = value;
+              loadImageUrl(value);
+            }
+          });
+        }
+      }
+
+      async function pasteFromClipboardButton() {
+        if (!navigator.clipboard) {
+          setStatus('Clipboard API is unavailable here. Try Ctrl/Cmd+V while the page is focused.', 'error', 4500);
+          return;
+        }
+
+        try {
+          if (navigator.clipboard.read) {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+              const imageType = item.types.find((type) => type.startsWith('image/'));
+              if (imageType) {
+                const blob = await item.getType(imageType);
+                loadBlob(blob, 'clipboard image', imageType);
+                return;
+              }
+            }
+          }
+
+          const text = await navigator.clipboard.readText();
+          const value = (text || '').trim();
+          if (looksLikeImageUrl(value)) {
+            urlInput.value = value;
+            loadImageUrl(value);
+          } else {
+            setStatus('Clipboard did not contain an image or image URL.', 'error', 3500);
+          }
+        } catch (error) {
+          setStatus('Clipboard access was blocked. Use Ctrl/Cmd+V, or serve this file over HTTPS/localhost.', 'error', 5200);
+        }
+      }
+
+      function looksLikeImageUrl(value) {
+        if (!value) return false;
+        return /^(https?:\/\/|data:image\/|blob:)/i.test(value);
+      }
+
+      function loadBlob(blob, name, forcedType) {
+        if (!blob || !(forcedType || blob.type || '').startsWith('image/')) {
+          setStatus('That file does not look like an image.', 'error', 3000);
+          return;
+        }
+
+        if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl);
+        lastObjectUrl = URL.createObjectURL(blob);
+
+        loadImageElement(lastObjectUrl, {
+          source: name || 'local image',
+          type: forcedType || blob.type || 'image/*',
+          bytes: blob.size || null,
+          url: '',
+          revokeAfterLoad: false,
+          localObjectUrl: true
+        });
+      }
+
+      function loadImageUrl(url) {
+        if (!looksLikeImageUrl(url)) {
+          setStatus('Use a direct http(s), data:image, or blob image URL.', 'error', 3800);
+          return;
+        }
+
+        loadImageElement(url, {
+          source: url,
+          type: 'remote image URL',
+          bytes: null,
+          url,
+          revokeAfterLoad: false,
+          localObjectUrl: false
+        });
+      }
+
+      function loadImageElement(src, meta) {
+        const img = new Image();
+        img.decoding = 'async';
+
+        if (/^https?:\/\//i.test(src)) {
+          img.crossOrigin = 'anonymous';
+        }
+
+        setStatus('Loading image…', '', 0);
+
+        img.onload = () => {
+          try {
+            uploadTextureFromSource(img, {
+              source: meta.source,
+              type: meta.type,
+              bytes: meta.bytes,
+              url: meta.url,
+              originalWidth: img.naturalWidth || img.width,
+              originalHeight: img.naturalHeight || img.height,
+              downscaled: false
+            });
+            resetView(false);
+            setStatus('Panorama loaded.', 'ok', 3000);
+          } catch (error) {
+            setStatus('Could not upload the image to WebGL: ' + error.message, 'error', 7000);
+          }
+        };
+
+        img.onerror = () => {
+          const corsNote = /^https?:\/\//i.test(src)
+            ? ' The server may not allow CORS access; use a local file, data URL, or a CORS-enabled image URL.'
+            : '';
+          setStatus('Could not load that image.' + corsNote, 'error', 8000);
+        };
+
+        img.src = src;
+      }
+
+      function uploadTextureFromSource(source, info) {
+        const originalWidth = info.originalWidth || source.naturalWidth || source.videoWidth || source.width;
+        const originalHeight = info.originalHeight || source.naturalHeight || source.videoHeight || source.height;
+        if (!originalWidth || !originalHeight) {
+          throw new Error('Image has no readable dimensions.');
+        }
+
+        let uploadSource = source;
+        let uploadedWidth = originalWidth;
+        let uploadedHeight = originalHeight;
+        let downscaled = false;
+
+        const maxSize = state.maxTextureSize || 4096;
+        const scale = Math.min(1, maxSize / originalWidth, maxSize / originalHeight);
+        if (scale < 1) {
+          uploadedWidth = Math.max(1, Math.floor(originalWidth * scale));
+          uploadedHeight = Math.max(1, Math.floor(originalHeight * scale));
+          const c = document.createElement('canvas');
+          c.width = uploadedWidth;
+          c.height = uploadedHeight;
+          const ctx = c.getContext('2d', { alpha: false });
+          ctx.drawImage(source, 0, 0, uploadedWidth, uploadedHeight);
+          uploadSource = c;
+          downscaled = true;
+        }
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        if (gl.UNPACK_COLORSPACE_CONVERSION_WEBGL !== undefined) {
+          gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+        }
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
+
+        state.textureInfo = {
+          source: info.source || 'image',
+          type: info.type || 'image',
+          bytes: info.bytes || null,
+          url: info.url || '',
+          originalWidth,
+          originalHeight,
+          uploadedWidth,
+          uploadedHeight,
+          downscaled: downscaled || Boolean(info.downscaled),
+          loadedAt: new Date()
+        };
+
+        updateSpecs(true);
+        updateExportPreview();
+      }
+
+      function handleWheel(event) {
+        event.preventDefault();
+        const amount = Math.sign(event.deltaY) * Math.min(8, Math.abs(event.deltaY) * 0.055);
+        setFov(state.fovDeg + amount);
+      }
+
+      function handlePointerDown(event) {
+        canvas.setPointerCapture(event.pointerId);
+        activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        canvas.classList.add('dragging');
+        isDragging = true;
+        state.pointerWasMoved = false;
+
+        if (activePointers.size === 1) {
+          dragStart = { x: event.clientX, y: event.clientY, yaw: state.yaw, pitch: state.pitch, fovDeg: state.fovDeg };
+        } else if (activePointers.size === 2) {
+          pinchStart = {
+            distance: pointerDistance(),
+            fovDeg: state.fovDeg
+          };
+        }
+      }
+
+      function handlePointerMove(event) {
+        if (!activePointers.has(event.pointerId)) return;
+        const previous = activePointers.get(event.pointerId);
+        activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+        if (activePointers.size === 2 && pinchStart) {
+          const distance = pointerDistance();
+          if (distance > 2) {
+            const ratio = pinchStart.distance / distance;
+            setFov(pinchStart.fovDeg * ratio);
+          }
+          return;
+        }
+
+        if (!isDragging || !dragStart || !previous) return;
+
+        const dx = event.clientX - previous.x;
+        const dy = event.clientY - previous.y;
+        if (Math.abs(event.clientX - dragStart.x) + Math.abs(event.clientY - dragStart.y) > 2) {
+          state.pointerWasMoved = true;
+        }
+
+        if (event.shiftKey) {
+          setFov(state.fovDeg + dy * 0.22);
+          return;
+        }
+
+        const sign = invertControlsEl.checked ? -1 : 1;
+        const sensitivity = state.mode === 'snowball' ? 0.0062 : 0.0048;
+        state.yaw += sign * dx * sensitivity;
+        state.pitch += sign * -dy * sensitivity;
+        state.pitch = clamp(state.pitch, -86 * DEG, 86 * DEG);
+      }
+
+      function handlePointerEnd(event) {
+        activePointers.delete(event.pointerId);
+        if (activePointers.size === 0) {
+          canvas.classList.remove('dragging');
+          isDragging = false;
+          dragStart = null;
+          pinchStart = null;
+        } else if (activePointers.size === 1) {
+          const remaining = Array.from(activePointers.values())[0];
+          dragStart = { x: remaining.x, y: remaining.y, yaw: state.yaw, pitch: state.pitch, fovDeg: state.fovDeg };
+          pinchStart = null;
+        }
+      }
+
+      function pointerDistance() {
+        const points = Array.from(activePointers.values());
+        if (points.length < 2) return 0;
+        const dx = points[0].x - points[1].x;
+        const dy = points[0].y - points[1].y;
+        return Math.hypot(dx, dy);
+      }
+
+      function setFov(value) {
+        state.fovDeg = clamp(Number(value) || 75, MIN_FOV, MAX_FOV);
+        fovRange.value = String(Math.round(state.fovDeg));
+        fovValue.textContent = Math.round(state.fovDeg) + '°';
+        updateExportPreview();
+      }
+
+      function resetView(showMessage = true) {
+        state.yaw = 0;
+        state.pitch = 0;
+        setFov(75);
+        if (showMessage) setStatus('View reset.', 'ok', 1800);
+      }
+
+      function resize() {
+        const rect = app.getBoundingClientRect();
+        state.cssWidth = Math.max(1, rect.width);
+        state.cssHeight = Math.max(1, rect.height);
+        state.dpr = Math.min(2.5, Math.max(1, window.devicePixelRatio || 1));
+
+        const width = Math.max(1, Math.floor(state.cssWidth * state.dpr));
+        const height = Math.max(1, Math.floor(state.cssHeight * state.dpr));
+
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+          overlayCanvas.width = width;
+          overlayCanvas.height = height;
+          overlayCtx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+        }
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        updateSpecs(true);
+        updateExportPreview();
+      }
+
+      function render(now) {
+        const t = now || 0;
+        const dt = state.lastFrameTime ? Math.min(0.05, (t - state.lastFrameTime) / 1000) : 0;
+        state.lastFrameTime = t;
+
+        if (autoRotateEl.checked && !isDragging && activePointers.size === 0 && !state.exportBusy) {
+          state.yaw += dt * (state.mode === 'snowball' ? 0.36 : 0.12);
+        }
+
+        if (state.yaw > Math.PI * 4 || state.yaw < -Math.PI * 4) {
+          state.yaw = normalizeAngle(state.yaw);
+        }
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        drawSceneAt({
+          width: canvas.width,
+          height: canvas.height,
+          yaw: state.yaw,
+          pitch: state.pitch,
+          fovDeg: state.fovDeg,
+          mode: state.mode,
+          showRefs: showRefsEl.checked
+        });
+
+        drawOverlay();
+
+        if (showSpecsEl.checked && t - state.lastSpecsUpdate > 250) {
+          updateSpecs(false);
+          state.lastSpecsUpdate = t;
+        }
+
+        requestAnimationFrame(render);
+      }
+
+      function drawSceneAt(params) {
+        gl.useProgram(program);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform2f(uniforms.resolution, params.width, params.height);
+        gl.uniform1f(uniforms.fov, params.fovDeg * DEG);
+        gl.uniform1f(uniforms.planetScale, planetScale(params.fovDeg));
+        gl.uniform1f(uniforms.yaw, params.yaw);
+        gl.uniform1f(uniforms.pitch, params.pitch);
+        gl.uniform1i(uniforms.mode, modeIndex(params.mode));
+        gl.uniform1i(uniforms.showRefs, params.showRefs ? 1 : 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+
+      function drawOverlay() {
+        const ctx = overlayCtx;
+        const w = state.cssWidth;
+        const h = state.cssHeight;
+        ctx.clearRect(0, 0, w, h);
+        drawOverlayForParams(ctx, w, h, {
+          mode: state.mode,
+          yaw: state.yaw,
+          pitch: state.pitch,
+          fovDeg: state.fovDeg,
+          showRefs: showRefsEl.checked
+        });
+      }
+
+      function drawOverlayForParams(ctx, w, h, params) {
+        if (params.mode === 'grid') {
+          drawGridLabels(ctx, w, h);
+        }
+
+        if (params.showRefs) {
+          drawAxisLabels(ctx, w, h, params);
+        }
+      }
+
+      function drawGridLabels(ctx, w, h) {
+        const labels = [
+          { x: 0, y: 0, text: '0° / front' },
+          { x: w / 2, y: 0, text: '+90° / right' },
+          { x: 0, y: h / 2, text: '+180° / back' },
+          { x: w / 2, y: h / 2, text: '+270° / left' }
+        ];
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(w / 2, 0);
+        ctx.lineTo(w / 2, h);
+        ctx.moveTo(0, h / 2);
+        ctx.lineTo(w, h / 2);
+        ctx.stroke();
+
+        for (const label of labels) {
+          drawPill(ctx, label.x + 10, label.y + 10, label.text, 'rgba(255,255,255,0.9)', 'rgba(5,10,18,0.64)');
+        }
+        ctx.restore();
+      }
+
+      function drawAxisLabels(ctx, w, h, params) {
+        const axes = [
+          { label: '+X', dir: [1, 0, 0], color: 'rgba(255,96,86,0.95)' },
+          { label: '-X', dir: [-1, 0, 0], color: 'rgba(255,96,86,0.62)' },
+          { label: '+Y', dir: [0, 1, 0], color: 'rgba(89,255,128,0.95)' },
+          { label: '-Y', dir: [0, -1, 0], color: 'rgba(89,255,128,0.62)' },
+          { label: '+Z', dir: [0, 0, 1], color: 'rgba(95,156,255,0.95)' },
+          { label: '-Z', dir: [0, 0, -1], color: 'rgba(95,156,255,0.62)' }
+        ];
+
+        const cells = viewCells(w, h, params.mode);
+        ctx.save();
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+        ctx.font = '700 12px system-ui, sans-serif';
+
+        for (const cell of cells) {
+          for (const axis of axes) {
+            const p = params.mode === 'snowball'
+              ? projectSnowball(axis.dir, cell, params)
+              : projectPerspective(axis.dir, cell, cell.yawOffset || 0, params);
+            if (!p) continue;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4.8, 0, Math.PI * 2);
+            ctx.fillStyle = axis.color;
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+            ctx.stroke();
+
+            const width = Math.max(28, ctx.measureText(axis.label).width + 14);
+            roundedRect(ctx, p.x - width / 2, p.y - 24, width, 18, 9);
+            ctx.fillStyle = 'rgba(5,10,18,0.66)';
+            ctx.fill();
+            ctx.fillStyle = axis.color;
+            ctx.fillText(axis.label, p.x, p.y - 15);
+          }
+        }
+        ctx.restore();
+      }
+
+      function drawPill(ctx, x, y, text, color, background) {
+        ctx.save();
+        ctx.font = '700 12px system-ui, sans-serif';
+        const width = ctx.measureText(text).width + 18;
+        const height = 24;
+        roundedRect(ctx, x, y, width, height, 12);
+        ctx.fillStyle = background;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.13)';
+        ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, x + 9, y + height / 2);
+        ctx.restore();
+      }
+
+      function roundedRect(ctx, x, y, width, height, radius) {
+        const r = Math.min(radius, width / 2, height / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + width, y, x + width, y + height, r);
+        ctx.arcTo(x + width, y + height, x, y + height, r);
+        ctx.arcTo(x, y + height, x, y, r);
+        ctx.arcTo(x, y, x + width, y, r);
+        ctx.closePath();
+      }
+
+      function viewCells(w, h, mode) {
+        if (mode === 'grid') {
+          return [
+            { x: 0, y: 0, w: w / 2, h: h / 2, yawOffset: 0 },
+            { x: w / 2, y: 0, w: w / 2, h: h / 2, yawOffset: Math.PI / 2 },
+            { x: 0, y: h / 2, w: w / 2, h: h / 2, yawOffset: Math.PI },
+            { x: w / 2, y: h / 2, w: w / 2, h: h / 2, yawOffset: Math.PI * 1.5 }
+          ];
+        }
+        return [{ x: 0, y: 0, w, h, yawOffset: 0 }];
+      }
+
+      function projectPerspective(dirArray, cell, yawOffset, params) {
+        const dir = vec(dirArray[0], dirArray[1], dirArray[2]);
+        let cam = rotateYv(dir, -(params.yaw + yawOffset));
+        cam = rotateXv(cam, -params.pitch);
+
+        if (cam.z >= -0.0001) return null;
+        const t = Math.tan(params.fovDeg * DEG * 0.5);
+        const aspect = cell.w / cell.h;
+        const xNdc = (cam.x / -cam.z) / (t * aspect);
+        const yNdc = (cam.y / -cam.z) / t;
+        if (xNdc < -1 || xNdc > 1 || yNdc < -1 || yNdc > 1) return null;
+        return {
+          x: cell.x + (xNdc + 1) * 0.5 * cell.w,
+          y: cell.y + (1 - yNdc) * 0.5 * cell.h
+        };
+      }
+
+      function projectSnowball(dirArray, cell, params) {
+        let local = vec(dirArray[0], dirArray[1], dirArray[2]);
+        local = rotateYv(local, -params.yaw);
+        local = rotateXv(local, -params.pitch);
+        if (local.z > 0) return null;
+
+        const zoomT = clamp((params.fovDeg - MIN_FOV) / (MAX_FOV - MIN_FOV), 0, 1);
+        const radius = 0.98 + (0.52 - 0.98) * zoomT;
+        const aspect = cell.w / cell.h;
+        const pX = local.x * radius;
+        const pY = local.y * radius;
+        const xNdc = pX / aspect;
+        const yNdc = pY;
+        if (xNdc < -1 || xNdc > 1 || yNdc < -1 || yNdc > 1) return null;
+        return {
+          x: cell.x + (xNdc + 1) * 0.5 * cell.w,
+          y: cell.y + (1 - yNdc) * 0.5 * cell.h
+        };
+      }
+
+      function vec(x, y, z) {
+        return { x, y, z };
+      }
+
+      function rotateXv(v, a) {
+        const s = Math.sin(a);
+        const c = Math.cos(a);
+        return { x: v.x, y: c * v.y - s * v.z, z: s * v.y + c * v.z };
+      }
+
+      function rotateYv(v, a) {
+        const s = Math.sin(a);
+        const c = Math.cos(a);
+        return { x: c * v.x - s * v.z, y: v.y, z: s * v.x + c * v.z };
+      }
+
+      function updateSpecs(force) {
+        specsEl.hidden = !showSpecsEl.checked;
+        if (!showSpecsEl.checked && !force) return;
+        if (!state.textureInfo) return;
+
+        const info = state.textureInfo;
+        const aspect = info.originalWidth / info.originalHeight;
+        const aspectDelta = Math.abs(aspect - 2);
+        const aspectStatus = aspectDelta <= 0.08
+          ? '<span class="ok">Looks like 2:1 equirectangular</span>'
+          : '<span class="warn">Not close to 2:1; may look distorted</span>';
+        const source = escapeHtml(info.source);
+        const bytes = info.bytes ? formatBytes(info.bytes) : 'n/a';
+        const loadedAt = info.loadedAt ? info.loadedAt.toLocaleTimeString() : 'n/a';
+
+        specsEl.innerHTML = `
+          <h2>Image specs</h2>
+          <dl>
+            <dt>Source</dt><dd>${source}</dd>
+            <dt>Type</dt><dd>${escapeHtml(info.type)}</dd>
+            <dt>Original size</dt><dd>${info.originalWidth} × ${info.originalHeight}px</dd>
+            <dt>Aspect</dt><dd>${aspect.toFixed(3)}:1<br>${aspectStatus}</dd>
+            <dt>GPU texture</dt><dd>${info.uploadedWidth} × ${info.uploadedHeight}px${info.downscaled ? '<br><span class="warn">Downscaled for this GPU</span>' : ''}</dd>
+            <dt>Max GPU texture</dt><dd>${state.maxTextureSize}px</dd>
+            <dt>Max render target</dt><dd>${state.maxRenderbufferSize}px</dd>
+            <dt>File size</dt><dd>${bytes}</dd>
+            <dt>Mode</dt><dd>${escapeHtml(modeLabel(state.mode))}</dd>
+            <dt>View</dt><dd>Yaw ${normalizeDegrees(state.yaw * RAD).toFixed(1)}° · Pitch ${(state.pitch * RAD).toFixed(1)}° · FOV ${state.fovDeg.toFixed(0)}°</dd>
+            <dt>Canvas</dt><dd>${Math.round(state.cssWidth)} × ${Math.round(state.cssHeight)} CSS px · DPR ${state.dpr.toFixed(2)}</dd>
+            <dt>Loaded</dt><dd>${loadedAt}</dd>
+          </dl>
+        `;
+      }
+
+      function setupExportDialog() {
+        populateDatalist('formatOptions', EXPORT_CONFIG.editableDefaults.formats || ['webp', 'gif']);
+        populateDatalist('resolutionOptions', EXPORT_CONFIG.editableDefaults.resolutionMaxEdges || ['auto', 720, 1080, 1440]);
+        populateDatalist('frameOptions', EXPORT_CONFIG.editableDefaults.frameCounts || [24, 48, 72, 96]);
+        populateDatalist('durationOptions', EXPORT_CONFIG.editableDefaults.loopSeconds || [6, 8, 10, 12]);
+        populateDatalist('qualityOptions', EXPORT_CONFIG.editableDefaults.webpQualities || [0.75, 0.8, 0.85, 0.9]);
+        populateDatalist('gifColorOptions', EXPORT_CONFIG.editableDefaults.gifColors || [128, 192, 256]);
+
+        const defaultPreset = EXPORT_CONFIG.defaultPreset || 'Medium';
+        exportPresetEl.value = EXPORT_CONFIG.presets[defaultPreset] ? defaultPreset : 'Medium';
+        applyExportPreset(exportPresetEl.value);
+
+        exportPresetEl.addEventListener('change', () => {
+          if (exportPresetEl.value !== 'Custom') applyExportPreset(exportPresetEl.value);
+          updateExportPreview();
+        });
+
+        for (const el of [exportFormatEl, exportResolutionEl, exportFramesEl, exportLoopSecondsEl, exportWebpQualityEl, exportGifColorsEl]) {
+          el.addEventListener('input', () => {
+            exportPresetEl.value = 'Custom';
+            updateExportPreview();
+          });
+        }
+      }
+
+      function populateDatalist(id, values) {
+        const el = document.getElementById(id);
+        el.innerHTML = '';
+        for (const value of values) {
+          const option = document.createElement('option');
+          option.value = String(value);
+          el.appendChild(option);
+        }
+      }
+
+      function applyExportPreset(name) {
+        const preset = EXPORT_CONFIG.presets[name] || EXPORT_CONFIG.presets.Medium;
+        exportFormatEl.value = preset.format || 'webp';
+        exportResolutionEl.value = String(preset.resolutionMaxEdge ?? 800);
+        exportFramesEl.value = String(preset.frames ?? 48);
+        exportLoopSecondsEl.value = String(preset.loopSeconds ?? 8);
+        exportWebpQualityEl.value = String(preset.webpQuality ?? 0.8);
+        exportGifColorsEl.value = String(preset.gifColors ?? 192);
+        updateExportPreview();
+      }
+
+      function openExportDialog() {
+        if (state.exportBusy) return;
+        exportDialog.hidden = false;
+        updateExportPreview();
+      }
+
+      function closeExportDialog() {
+        if (state.exportBusy) return;
+        exportDialog.hidden = true;
+      }
+
+      function getExportOptions() {
+        const preset = EXPORT_CONFIG.presets[exportPresetEl.value] || {};
+        const format = String(exportFormatEl.value || preset.format || 'webp').trim().toLowerCase();
+        const frames = clamp(Math.round(Number(exportFramesEl.value) || preset.frames || 48), 2, 360);
+        const loopSeconds = clamp(Number(exportLoopSecondsEl.value) || preset.loopSeconds || 8, 0.2, 120);
+        const webpQuality = clamp(Number(exportWebpQualityEl.value) || preset.webpQuality || 0.8, 0.05, 1);
+        const gifColors = clamp(Math.round(Number(exportGifColorsEl.value) || preset.gifColors || 192), 2, 256);
+        const gifSamplePixels = clamp(Math.round(Number(preset.gifSamplePixels) || 90000), 10000, 600000);
+        const dimensions = resolveExportDimensions(exportResolutionEl.value || preset.resolutionMaxEdge || 800);
+        return { format, frames, loopSeconds, webpQuality, gifColors, gifSamplePixels, width: dimensions.width, height: dimensions.height, resolutionLabel: dimensions.label };
+      }
+
+      function resolveExportDimensions(value) {
+        const maxTarget = Math.max(16, Math.min(state.maxTextureSize || 4096, state.maxRenderbufferSize || 4096));
+        const aspect = Math.max(0.05, state.cssWidth / Math.max(1, state.cssHeight));
+        const raw = String(value ?? 'auto').trim().toLowerCase();
+
+        let width;
+        let height;
+        let label = raw;
+
+        const explicit = raw.match(/^(\d{2,5})\s*[x×]\s*(\d{2,5})$/i);
+        if (explicit) {
+          width = Number(explicit[1]);
+          height = Number(explicit[2]);
+        } else {
+          let maxEdge;
+          if (raw === 'auto' || raw === '') {
+            const info = state.textureInfo;
+            const sourceViewEdge = info ? Math.max(info.uploadedWidth / 2, info.uploadedHeight) : 1080;
+            const cap = Number(EXPORT_CONFIG.autoResolution.maxEdgeCap) || 1600;
+            const preferSource = EXPORT_CONFIG.autoResolution.preferSourceResolution !== false;
+            maxEdge = preferSource ? Math.min(sourceViewEdge, cap, maxTarget) : Math.min(cap, maxTarget);
+            maxEdge = Math.max(Number(EXPORT_CONFIG.autoResolution.minEdge) || 360, maxEdge);
+            label = 'auto';
+          } else {
+            maxEdge = Number(raw) || 800;
+          }
+          maxEdge = clamp(Math.round(maxEdge), 16, maxTarget);
+          if (aspect >= 1) {
+            width = maxEdge;
+            height = Math.round(maxEdge / aspect);
+          } else {
+            height = maxEdge;
+            width = Math.round(maxEdge * aspect);
+          }
+        }
+
+        const scale = Math.min(1, maxTarget / Math.max(width, height));
+        width = Math.max(16, Math.round(width * scale));
+        height = Math.max(16, Math.round(height * scale));
+        width = makeEven(width);
+        height = makeEven(height);
+        return { width, height, label };
+      }
+
+      function updateExportPreview() {
+        if (!exportPreviewEl) return;
+        try {
+          const options = getExportOptions();
+          const delayMs = Math.max(10, Math.round((options.loopSeconds * 1000) / options.frames));
+          const pixels = options.width * options.height * options.frames;
+          const formatNote = options.format === 'webp'
+            ? `WebP quality ${options.webpQuality.toFixed(2)} with browser compression.`
+            : `GIF with ${options.gifColors} colors. GIF files can still be large at high resolutions.`;
+          exportPreviewEl.innerHTML = `Output: <strong>${options.width} × ${options.height}px</strong> · ${options.frames} frames · ${options.loopSeconds.toFixed(1)}s loop · ${delayMs}ms/frame<br>${formatNote}<br>Workload: ${formatPixels(pixels)} rendered pixels.`;
+        } catch (error) {
+          exportPreviewEl.textContent = 'Adjust export settings to preview the output.';
+        }
+      }
+
+      async function startExport() {
+        if (state.exportBusy) return;
+        const options = getExportOptions();
+        if (!['gif', 'webp'].includes(options.format)) {
+          setStatus('Choose gif or webp as the export format.', 'error', 3600);
+          return;
+        }
+
+        state.exportBusy = true;
+        setExportControlsDisabled(true);
+        setStatus(`Rendering ${options.format.toUpperCase()} frames…`, '', 0);
+
+        const snapshot = {
+          yaw: state.yaw,
+          pitch: state.pitch,
+          fovDeg: state.fovDeg,
+          mode: state.mode,
+          showRefs: showRefsEl.checked
+        };
+
+        let target = null;
+        try {
+          target = createExportTarget(options.width, options.height);
+          const blob = options.format === 'webp'
+            ? await exportAnimatedWebP(target, snapshot, options)
+            : await exportAnimatedGif(target, snapshot, options);
+
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          const extension = options.format === 'webp' ? 'webp' : 'gif';
+          downloadBlob(blob, `panorama-loop-${timestamp}.${extension}`);
+          setStatus(`${options.format.toUpperCase()} exported: ${formatBytes(blob.size)}.`, 'ok', 5200);
+          closeExportDialogAfterExport();
+        } catch (error) {
+          console.error(error);
+          setStatus('Export failed: ' + error.message, 'error', 8500);
+        } finally {
+          if (target) target.dispose();
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          gl.viewport(0, 0, canvas.width, canvas.height);
+          state.exportBusy = false;
+          setExportControlsDisabled(false);
+        }
+      }
+
+      function setExportControlsDisabled(disabled) {
+        for (const el of [exportPresetEl, exportFormatEl, exportResolutionEl, exportFramesEl, exportLoopSecondsEl, exportWebpQualityEl, exportGifColorsEl, exportCancelButton, startExportButton, exportButton]) {
+          el.disabled = disabled;
+        }
+        startExportButton.textContent = disabled ? 'Generating…' : 'Generate';
+      }
+
+      function closeExportDialogAfterExport() {
+        exportDialog.hidden = true;
+      }
+
+      function createExportTarget(width, height) {
+        const targetTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, targetTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+        const framebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, targetTexture, 0);
+        const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        if (status !== gl.FRAMEBUFFER_COMPLETE) {
+          gl.deleteFramebuffer(framebuffer);
+          gl.deleteTexture(targetTexture);
+          throw new Error('This browser/GPU could not create the requested export render target. Try a smaller resolution.');
+        }
+
+        return {
+          framebuffer,
+          texture: targetTexture,
+          width,
+          height,
+          dispose() {
+            gl.deleteFramebuffer(framebuffer);
+            gl.deleteTexture(targetTexture);
+          }
+        };
+      }
+
+      function renderExportFrame(target, snapshot, options, index) {
+        const loopYaw = snapshot.yaw + (index / options.frames) * Math.PI * 2;
+        const params = {
+          width: target.width,
+          height: target.height,
+          yaw: loopYaw,
+          pitch: snapshot.pitch,
+          fovDeg: snapshot.fovDeg,
+          mode: snapshot.mode,
+          showRefs: snapshot.showRefs
+        };
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+        gl.viewport(0, 0, target.width, target.height);
+        drawSceneAt(params);
+        const rgba = readFramebufferPixels(target.width, target.height);
+        return { rgba, params };
+      }
+
+      function readFramebufferPixels(width, height) {
+        const raw = new Uint8Array(width * height * 4);
+        gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, raw);
+        const flipped = new Uint8ClampedArray(raw.length);
+        const rowBytes = width * 4;
+        for (let y = 0; y < height; y++) {
+          const src = (height - 1 - y) * rowBytes;
+          const dst = y * rowBytes;
+          flipped.set(raw.subarray(src, src + rowBytes), dst);
+        }
+        return flipped;
+      }
+
+      function drawExportOverlayToCanvas(ctx, width, height, params) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        drawOverlayForParams(ctx, width, height, params);
+        ctx.restore();
+      }
+
+      function makeFrameCanvas(width, height) {
+        const c = document.createElement('canvas');
+        c.width = width;
+        c.height = height;
+        const ctx = c.getContext('2d', { alpha: false, willReadFrequently: true });
+        return { canvas: c, ctx };
+      }
+
+      async function exportAnimatedWebP(target, snapshot, options) {
+        if (!supportsCanvasMime('image/webp')) {
+          throw new Error('This browser does not expose canvas WebP encoding. Try GIF, or use a Chromium/Firefox-based browser.');
+        }
+
+        const frameCanvas = makeFrameCanvas(target.width, target.height);
+        const frameChunks = [];
+        const delayMs = Math.max(10, Math.round((options.loopSeconds * 1000) / options.frames));
+
+        for (let i = 0; i < options.frames; i++) {
+          const { rgba, params } = renderExportFrame(target, snapshot, options, i);
+          const imageData = new ImageData(rgba, target.width, target.height);
+          frameCanvas.ctx.putImageData(imageData, 0, 0);
+          drawExportOverlayToCanvas(frameCanvas.ctx, target.width, target.height, params);
+          const blob = await canvasToBlob(frameCanvas.canvas, 'image/webp', options.webpQuality);
+          if (!blob) throw new Error('WebP frame encoding failed.');
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+          frameChunks.push(extractWebPFrameChunks(bytes));
+          setStatus(`Encoding WEBP frame ${i + 1} / ${options.frames}…`, '', 0);
+          await yieldToBrowser();
+        }
+
+        const bytes = buildAnimatedWebP(frameChunks, target.width, target.height, delayMs, 0);
+        return new Blob([bytes], { type: 'image/webp' });
+      }
+
+      async function exportAnimatedGif(target, snapshot, options) {
+        const frameCanvas = makeFrameCanvas(target.width, target.height);
+        const frames = [];
+        const delayCs = Math.max(1, Math.round((options.loopSeconds * 100) / options.frames));
+
+        for (let i = 0; i < options.frames; i++) {
+          const { rgba, params } = renderExportFrame(target, snapshot, options, i);
+          const imageData = new ImageData(rgba, target.width, target.height);
+          frameCanvas.ctx.putImageData(imageData, 0, 0);
+          drawExportOverlayToCanvas(frameCanvas.ctx, target.width, target.height, params);
+          const composited = frameCanvas.ctx.getImageData(0, 0, target.width, target.height).data;
+          frames.push(new Uint8ClampedArray(composited));
+          setStatus(`Rendering GIF frame ${i + 1} / ${options.frames}…`, '', 0);
+          await yieldToBrowser();
+        }
+
+        setStatus('Building GIF color palette…', '', 0);
+        const palette = makePalette(frames, options.gifColors, options.gifSamplePixels);
+        setStatus('Compressing GIF frames…', '', 0);
+        const bytes = encodeGif(frames, target.width, target.height, palette, delayCs, (done, total) => {
+          if (done % 4 === 0 || done === total) setStatus(`Compressing GIF frame ${done} / ${total}…`, '', 0);
+        });
+        return new Blob([bytes], { type: 'image/gif' });
+      }
+
+      function supportsCanvasMime(mime) {
+        const c = document.createElement('canvas');
+        c.width = c.height = 1;
+        try {
+          return c.toDataURL(mime).startsWith(`data:${mime}`);
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function canvasToBlob(c, type, quality) {
+        return new Promise((resolve) => c.toBlob(resolve, type, quality));
+      }
+
+      function extractWebPFrameChunks(bytes) {
+        if (ascii(bytes, 0, 4) !== 'RIFF' || ascii(bytes, 8, 4) !== 'WEBP') {
+          throw new Error('Browser returned an invalid WebP frame.');
+        }
+        const chunks = [];
+        let pos = 12;
+        while (pos + 8 <= bytes.length) {
+          const tag = ascii(bytes, pos, 4);
+          const size = readU32(bytes, pos + 4);
+          const end = pos + 8 + size;
+          const paddedEnd = end + (size & 1);
+          if (paddedEnd > bytes.length) break;
+          if (tag === 'ALPH' || tag === 'VP8 ' || tag === 'VP8L') {
+            chunks.push(bytes.slice(pos, paddedEnd));
+          }
+          pos = paddedEnd;
+        }
+        if (!chunks.some((chunk) => ascii(chunk, 0, 4) === 'VP8 ' || ascii(chunk, 0, 4) === 'VP8L')) {
+          throw new Error('No usable VP8/VP8L data was found in a WebP frame.');
+        }
+        return concatUint8(chunks);
+      }
+
+      function buildAnimatedWebP(frameChunks, width, height, durationMs, loopCount) {
+        const vp8x = new Uint8Array(10);
+        vp8x[0] = 0x02;
+        writeU24(vp8x, 4, width - 1);
+        writeU24(vp8x, 7, height - 1);
+
+        const anim = new Uint8Array(6);
+        anim[0] = 0;
+        anim[1] = 0;
+        anim[2] = 0;
+        anim[3] = 255;
+        writeU16(anim, 4, loopCount || 0);
+
+        const chunks = [riffChunk('VP8X', vp8x), riffChunk('ANIM', anim)];
+        for (const frameData of frameChunks) {
+          const header = new Uint8Array(16);
+          writeU24(header, 0, 0);
+          writeU24(header, 3, 0);
+          writeU24(header, 6, width - 1);
+          writeU24(header, 9, height - 1);
+          writeU24(header, 12, clamp(Math.round(durationMs), 10, 16777215));
+          header[15] = 0x01;
+          chunks.push(riffChunk('ANMF', concatUint8([header, frameData])));
+        }
+
+        const body = concatUint8(chunks);
+        const out = new Uint8Array(12 + body.length);
+        writeAscii(out, 0, 'RIFF');
+        writeU32(out, 4, 4 + body.length);
+        writeAscii(out, 8, 'WEBP');
+        out.set(body, 12);
+        return out;
+      }
+
+      function riffChunk(tag, payload) {
+        const pad = payload.length & 1;
+        const out = new Uint8Array(8 + payload.length + pad);
+        writeAscii(out, 0, tag);
+        writeU32(out, 4, payload.length);
+        out.set(payload, 8);
+        return out;
+      }
+
+      function ascii(bytes, offset, length) {
+        let s = '';
+        for (let i = 0; i < length; i++) s += String.fromCharCode(bytes[offset + i]);
+        return s;
+      }
+
+      function writeAscii(bytes, offset, s) {
+        for (let i = 0; i < s.length; i++) bytes[offset + i] = s.charCodeAt(i) & 255;
+      }
+
+      function readU32(bytes, offset) {
+        return (bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (bytes[offset + 3] << 24)) >>> 0;
+      }
+
+      function writeU16(bytes, offset, value) {
+        bytes[offset] = value & 255;
+        bytes[offset + 1] = (value >> 8) & 255;
+      }
+
+      function writeU24(bytes, offset, value) {
+        bytes[offset] = value & 255;
+        bytes[offset + 1] = (value >> 8) & 255;
+        bytes[offset + 2] = (value >> 16) & 255;
+      }
+
+      function writeU32(bytes, offset, value) {
+        bytes[offset] = value & 255;
+        bytes[offset + 1] = (value >> 8) & 255;
+        bytes[offset + 2] = (value >> 16) & 255;
+        bytes[offset + 3] = (value >> 24) & 255;
+      }
+
+      function makePalette(frames, wantedColors, sampleLimit) {
+        const wanted = clamp(Math.round(wantedColors) || 256, 2, 256);
+        const samples = [];
+        const perFrameLimit = Math.max(64, Math.ceil(sampleLimit / Math.max(1, frames.length)));
+        for (const rgba of frames) {
+          const pixels = rgba.length / 4;
+          const step = Math.max(1, Math.floor(pixels / perFrameLimit));
+          for (let p = 0; p < pixels; p += step) {
+            const i = p * 4;
+            samples.push((rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2]);
+          }
+        }
+
+        if (!samples.length) return [[0, 0, 0], [255, 255, 255]];
+        let boxes = [analyzeBox(samples)];
+        while (boxes.length < wanted) {
+          boxes.sort((a, b) => (b.range * b.colors.length) - (a.range * a.colors.length));
+          const index = boxes.findIndex((box) => box.colors.length > 1 && box.range > 0);
+          if (index < 0) break;
+          const box = boxes.splice(index, 1)[0];
+          const channel = box.channel;
+          box.colors.sort((ca, cb) => channelValue(ca, channel) - channelValue(cb, channel));
+          const mid = Math.floor(box.colors.length / 2);
+          boxes.push(analyzeBox(box.colors.slice(0, mid)));
+          boxes.push(analyzeBox(box.colors.slice(mid)));
+        }
+
+        const palette = boxes.map((box) => averageColor(box.colors));
+        while (palette.length < 256) palette.push(palette[palette.length - 1] || [0, 0, 0]);
+        return palette.slice(0, 256);
+      }
+
+      function analyzeBox(colors) {
+        let rMin = 255, gMin = 255, bMin = 255;
+        let rMax = 0, gMax = 0, bMax = 0;
+        for (const color of colors) {
+          const r = (color >> 16) & 255;
+          const g = (color >> 8) & 255;
+          const b = color & 255;
+          if (r < rMin) rMin = r;
+          if (r > rMax) rMax = r;
+          if (g < gMin) gMin = g;
+          if (g > gMax) gMax = g;
+          if (b < bMin) bMin = b;
+          if (b > bMax) bMax = b;
+        }
+        const rRange = rMax - rMin;
+        const gRange = gMax - gMin;
+        const bRange = bMax - bMin;
+        const range = Math.max(rRange, gRange, bRange);
+        const channel = range === rRange ? 0 : (range === gRange ? 1 : 2);
+        return { colors, range, channel };
+      }
+
+      function channelValue(color, channel) {
+        if (channel === 0) return (color >> 16) & 255;
+        if (channel === 1) return (color >> 8) & 255;
+        return color & 255;
+      }
+
+      function averageColor(colors) {
+        let r = 0, g = 0, b = 0;
+        for (const color of colors) {
+          r += (color >> 16) & 255;
+          g += (color >> 8) & 255;
+          b += color & 255;
+        }
+        const n = Math.max(1, colors.length);
+        return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
+      }
+
+      function encodeGif(frames, width, height, palette, delayCs, progress) {
+        const writer = new ByteWriter();
+        writer.ascii('GIF89a');
+        writer.u16(width);
+        writer.u16(height);
+        writer.byte(0xF7);
+        writer.byte(0);
+        writer.byte(0);
+
+        for (let i = 0; i < 256; i++) {
+          const color = palette[i] || [0, 0, 0];
+          writer.byte(color[0]);
+          writer.byte(color[1]);
+          writer.byte(color[2]);
+        }
+
+        writer.byte(0x21); writer.byte(0xFF); writer.byte(0x0B);
+        writer.ascii('NETSCAPE2.0');
+        writer.byte(0x03); writer.byte(0x01); writer.u16(0); writer.byte(0x00);
+
+        for (let i = 0; i < frames.length; i++) {
+          const indices = mapFrameToPalette(frames[i], palette);
+          writer.byte(0x21); writer.byte(0xF9); writer.byte(0x04);
+          writer.byte(0x00);
+          writer.u16(delayCs);
+          writer.byte(0);
+          writer.byte(0);
+
+          writer.byte(0x2C);
+          writer.u16(0); writer.u16(0); writer.u16(width); writer.u16(height);
+          writer.byte(0x00);
+
+          writer.byte(8);
+          const compressed = lzwEncode(indices, 8);
+          writeSubBlocks(writer, compressed);
+          if (progress) progress(i + 1, frames.length);
+        }
+
+        writer.byte(0x3B);
+        return writer.toUint8Array();
+      }
+
+      function mapFrameToPalette(rgba, palette) {
+        const pixels = rgba.length / 4;
+        const out = new Uint8Array(pixels);
+        const cache = new Int16Array(32768);
+        cache.fill(-1);
+        for (let p = 0; p < pixels; p++) {
+          const i = p * 4;
+          const r = rgba[i];
+          const g = rgba[i + 1];
+          const b = rgba[i + 2];
+          const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+          let idx = cache[key];
+          if (idx < 0) {
+            idx = nearestPaletteIndex(r, g, b, palette);
+            cache[key] = idx;
+          }
+          out[p] = idx;
+        }
+        return out;
+      }
+
+      function nearestPaletteIndex(r, g, b, palette) {
+        let best = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < palette.length; i++) {
+          const c = palette[i];
+          const dr = r - c[0];
+          const dg = g - c[1];
+          const db = b - c[2];
+          const dist = dr * dr * 0.30 + dg * dg * 0.59 + db * db * 0.11;
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = i;
+            if (dist === 0) break;
+          }
+        }
+        return best;
+      }
+
+      function lzwEncode(indices, minCodeSize) {
+        const clearCode = 1 << minCodeSize;
+        const endCode = clearCode + 1;
+        let nextCode = endCode + 1;
+        let codeSize = minCodeSize + 1;
+        const dict = new Map();
+        const out = [];
+        let bitBuffer = 0;
+        let bitCount = 0;
+
+        function writeCode(code) {
+          bitBuffer |= code << bitCount;
+          bitCount += codeSize;
+          while (bitCount >= 8) {
+            out.push(bitBuffer & 255);
+            bitBuffer >>= 8;
+            bitCount -= 8;
+          }
+        }
+
+        function resetDict() {
+          dict.clear();
+          nextCode = endCode + 1;
+          codeSize = minCodeSize + 1;
+        }
+
+        if (!indices.length) return new Uint8Array();
+        writeCode(clearCode);
+        let prefix = indices[0];
+
+        for (let i = 1; i < indices.length; i++) {
+          const k = indices[i];
+          const key = (prefix << 8) | k;
+          const found = dict.get(key);
+          if (found !== undefined) {
+            prefix = found;
+          } else {
+            writeCode(prefix);
+            if (nextCode < 4096) {
+              dict.set(key, nextCode++);
+              if (nextCode === (1 << codeSize) && codeSize < 12) codeSize++;
+            } else {
+              writeCode(clearCode);
+              resetDict();
+            }
+            prefix = k;
+          }
+        }
+
+        writeCode(prefix);
+        writeCode(endCode);
+        if (bitCount > 0) out.push(bitBuffer & 255);
+        return new Uint8Array(out);
+      }
+
+      function writeSubBlocks(writer, bytes) {
+        let offset = 0;
+        while (offset < bytes.length) {
+          const size = Math.min(255, bytes.length - offset);
+          writer.byte(size);
+          writer.bytes(bytes.subarray(offset, offset + size));
+          offset += size;
+        }
+        writer.byte(0);
+      }
+
+      class ByteWriter {
+        constructor() {
+          this.parts = [];
+          this.length = 0;
+        }
+        byte(value) {
+          const b = new Uint8Array(1);
+          b[0] = value & 255;
+          this.parts.push(b);
+          this.length += 1;
+        }
+        bytes(values) {
+          const b = values instanceof Uint8Array ? values : new Uint8Array(values);
+          this.parts.push(b);
+          this.length += b.length;
+        }
+        u16(value) {
+          const b = new Uint8Array(2);
+          b[0] = value & 255;
+          b[1] = (value >> 8) & 255;
+          this.bytes(b);
+        }
+        ascii(value) {
+          const b = new Uint8Array(value.length);
+          for (let i = 0; i < value.length; i++) b[i] = value.charCodeAt(i) & 255;
+          this.bytes(b);
+        }
+        toUint8Array() {
+          return concatUint8(this.parts, this.length);
+        }
+      }
+
+      function concatUint8(chunks, knownLength) {
+        const length = knownLength ?? chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        const out = new Uint8Array(length);
+        let offset = 0;
+        for (const chunk of chunks) {
+          out.set(chunk, offset);
+          offset += chunk.length;
+        }
+        return out;
+      }
+
+      function downloadBlob(blob, filename) {
+        if (state.lastExportUrl) URL.revokeObjectURL(state.lastExportUrl);
+        state.lastExportUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = state.lastExportUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+
+      function yieldToBrowser() {
+        return new Promise((resolve) => setTimeout(resolve, 0));
+      }
+
+      function setStatus(message, type = '', timeout = 3200) {
+        window.clearTimeout(statusTimer);
+        statusEl.textContent = message;
+        statusEl.className = 'show' + (type ? ' ' + type : '');
+        if (timeout > 0) {
+          statusTimer = window.setTimeout(() => {
+            statusEl.className = '';
+          }, timeout);
+        }
+      }
+
+      function modeIndex(mode) {
+        if (mode === 'grid') return 1;
+        if (mode === 'snowball') return 2;
+        return 0;
+      }
+
+      function modeLabel(mode) {
+        if (mode === 'grid') return 'Grid 4-up: 0°, 90°, 180°, 270°';
+        if (mode === 'snowball') return 'Snowball: rendered sphere/object rotation';
+        return 'Immersive 3D perspective';
+      }
+
+      function modeDescription(mode) {
+        if (mode === 'grid') return 'Grid mode: four synchronized 90° views cover the full 360° rotation.';
+        if (mode === 'snowball') return 'Snowball mode: drag to rotate the rendered panorama sphere instead of moving your view.';
+        return 'Immersive mode: drag to look around inside the panorama.';
+      }
+
+      function planetScale(fovDeg = state.fovDeg) {
+        const t = (fovDeg - MIN_FOV) / (MAX_FOV - MIN_FOV);
+        return 0.48 + t * 2.25;
+      }
+
+      function normalizeAngle(angle) {
+        return Math.atan2(Math.sin(angle), Math.cos(angle));
+      }
+
+      function normalizeDegrees(degrees) {
+        let value = degrees % 360;
+        if (value > 180) value -= 360;
+        if (value < -180) value += 360;
+        return value;
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function makeEven(value) {
+        value = Math.max(2, Math.round(value));
+        return value % 2 ? value + 1 : value;
+      }
+
+      function formatBytes(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) return 'n/a';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let size = bytes;
+        let unit = 0;
+        while (size >= 1024 && unit < units.length - 1) {
+          size /= 1024;
+          unit += 1;
+        }
+        return `${size.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+      }
+
+      function formatPixels(pixels) {
+        if (pixels >= 1e9) return (pixels / 1e9).toFixed(2) + 'B';
+        if (pixels >= 1e6) return (pixels / 1e6).toFixed(1) + 'M';
+        if (pixels >= 1e3) return (pixels / 1e3).toFixed(1) + 'K';
+        return String(pixels);
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      try {
+        init();
+      } catch (error) {
+        document.body.innerHTML = `<div style="padding:24px;font-family:system-ui,sans-serif;color:white;background:#10131c;min-height:100vh"><h1>360° viewer could not start</h1><p>${escapeHtml(error.message)}</p></div>`;
+      }
+    })();
+  </script>
+</body>
+</html>
